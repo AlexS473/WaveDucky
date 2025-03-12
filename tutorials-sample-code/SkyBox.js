@@ -256,12 +256,12 @@ async function createTextureFromImages(device, filenames, options) {
 const texture = await createTextureFromImages(
     device,
     [
-        'cubeMap/xp.png',
-        'cubeMap/xn.png',
-        'cubeMap/yp.png',
-        'cubeMap/yn.png',
-        'cubeMap/zp.png',
-        'cubeMap/zn.png',
+        'images/xp.png',
+        'images/xn.png',
+        'images/yp.png',
+        'images/yn.png',
+        'images/zp.png',
+        'images/zn.png',
     ],
     {mips: true, flipY: false},
 );
@@ -383,7 +383,7 @@ function render(time) {
     device.queue.submit([commandBuffer]);
 
     requestAnimationFrame(render);
-    }
+}
     requestAnimationFrame(render);
 
     const observer = new ResizeObserver(entries => {
