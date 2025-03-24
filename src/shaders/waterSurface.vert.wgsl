@@ -10,6 +10,7 @@ struct VertexOutput{
 @binding(0) @group(0) var<uniform> reflectTex: sampler;
 @binding(1) @group(0) var<uniform> refractTex:sampler; //sampler2D
 @binding(2) @group(0) var<uniform> noiseTex:sampler; //sampler3D
+@binding(3) @group(0) var<uniform> globalAmbient:vec4f;
 
 struct PositionalLight
 {	ambient:vec4f,
@@ -24,7 +25,6 @@ struct Material
 	shininess:f32,
 };
 
-var<uniform> globalAmbient:vec4f;
 var<uniform> light:PositionalLight;
 var<uniform> material:Material;
 var<uniform> m_matrix:mat4x4f;

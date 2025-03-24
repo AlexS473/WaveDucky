@@ -7,9 +7,12 @@ struct FragmentInput{
 @location(4) glp:vec4f,
 }
 
-@binding(0) @group(0) var<uniform> reflectTex: sampler;
-@binding(1) @group(0) var<uniform> refractTex:sampler; //sampler2D
-@binding(2) @group(0) var<uniform> noiseTex:sampler; //sampler3D
+@group(0) @binding(0)  var<uniform> reflectTexSampler: sampler;
+@group(0) @binding(1)  var<uniform> reflectTex: texture_2d<f32>;
+@group(0) @binding(2)  var<uniform> refractTexSampler:sampler;
+@group(0) @binding(3)  var<uniform> refractTex:texture_2d<f32>;//sampler2D
+@group(0) @binding(4)  var<uniform> noiseTexSampler:sampler; //sampler3D
+@group(0) @binding(5)  var<uniform> noiseTex:texture_3d<f32>;
 
 struct PositionalLight
 {	ambient:vec4f,
