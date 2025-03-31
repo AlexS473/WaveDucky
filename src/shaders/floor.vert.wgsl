@@ -16,13 +16,22 @@ struct Material
 	padding2: vec4f,
 };
 
-struct VertexOutput{
+/*struct VertexOutput{
 @builtin(position) pos : vec4f,
 @location(0) varyingNormal:vec3f,
 @location(1) varyingLightDir:vec3f,
 @location(2) varyingVertPos:vec3f,
 @location(3) tc:vec2f,
+}*/
+
+struct VertexOutput{
+    @builtin(position) pos : vec4f,
+    @location(0) tc: vec2f,
+    @location(1) varyingNormal: vec3f,
+    @location(2) varyingLightDir: vec3f,
+    @location(3) varyingVertPos: vec3f,
 }
+
 
 @group(0) @binding(0) var noiseSampler:sampler;
 @group(0) @binding(1) var noiseTexture: texture_3d<f32>;
@@ -40,7 +49,7 @@ struct VertexOutput{
 fn main(
   @location(0) position : vec3f,
   @location(1) texCoord : vec2f,
-  @location(2) vertNormal : vec3f
+  @location(2) vertNormal : vec3f,
 ) -> VertexOutput{
     var output:VertexOutput;
 	output.varyingVertPos = (m_matrix * vec4f(position,1.0)).xyz;

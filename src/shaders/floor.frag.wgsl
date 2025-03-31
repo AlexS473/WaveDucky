@@ -17,11 +17,11 @@ struct Material
 };
 
 struct FragmentInput{
-    @builtin(position) pos : vec4f,
-    @location(0) varyingNormal:vec3f,
-    @location(1) varyingLightDir:vec3f,
-    @location(2) varyingVertPos:vec3f,
-    @location(3) tc:vec2f,
+     @builtin(position) pos : vec4f,
+     @location(0) tc: vec2f,
+     @location(1) varyingNormal: vec3f,
+     @location(2) varyingLightDir: vec3f,
+     @location(3) varyingVertPos: vec3f,
 }
 
 @group(0) @binding(0) var noiseSampler:sampler;
@@ -82,9 +82,10 @@ fn getCausticValue(
 }
 
 @fragment
-fn main()-> @location(0) vec4f
+fn main(
+    input:FragmentInput
+)-> @location(0) vec4f
 {
-    var input:FragmentInput;
     let fogColor = vec4f(0.0, 0.0, 0.2, 1.0);
 	let fogStart = f32(10.0);
 	let fogEnd = f32(200.0);
@@ -111,10 +112,10 @@ fn main()-> @location(0) vec4f
 	let cosPhi = f32(dot(V,R));
 
 	// compute ADS contributions (per pixel):
-	let ambient = vec3f(((light.globalAmbient * material.ambient) + (light.ambient * material.ambient)).xyz);
-	let diffuse = vec3f(light.diffuse.xyz * material.diffuse.xyz * max(cosTheta,0.0));
+	let ambient = ((light.globalAmbient * material.ambient) + (light.ambient * material.ambient)).xyz;
+	let diffuse = light.diffuse.xyz * material.diffuse.xyz * max(cosTheta,0.0);
 	let specular = (light.specular.xyz * material.specular.xyz * pow(max(cosPhi,0.0), material.shininess));
-	let checkers = vec3f(checkerboard(input.tc));
+	let checkers = checkerboard(input.tc);
 
     return vec4f((checkers * (ambient + diffuse) + specular), 1.0);
 }

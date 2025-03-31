@@ -17,11 +17,11 @@ struct Material
 };
 
 struct VertexOutput{
-@builtin(position) pos : vec4f,
-@location(0) varyingNormal:vec3f,
-@location(1) varyingLightDir:vec3f,
-@location(2) varyingVertPos:vec3f,
-@location(3) tc:vec2f,
+     @builtin(position) pos : vec4f,
+     @location(0) tc: vec2f,
+     @location(1) varyingNormal: vec3f,
+     @location(2) varyingLightDir: vec3f,
+     @location(3) varyingVertPos: vec3f,
 }
 
 @group(0) @binding(0) var texSampler:sampler;
@@ -52,5 +52,6 @@ fn main(
 
 	output.tc = texCoord;
 	output.pos = p_matrix * v_matrix * m_matrix * vec4(position,1.0);
+	output.pos.z = 0.1;
 	return output;
 }

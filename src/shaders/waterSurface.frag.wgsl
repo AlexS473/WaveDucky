@@ -17,11 +17,11 @@ struct Material
 };
 
 struct FragmentInput{
-    @builtin(position) pos : vec4f,
-    @location(0) varyingNormal:vec3f,
-    @location(1) varyingLightDir:vec3f,
-    @location(2) varyingVertPos:vec3f,
-    @location(3) tc:vec2f,
+     @builtin(position) pos : vec4f,
+     @location(0) tc: vec2f,
+     @location(1) varyingNormal: vec3f,
+     @location(2) varyingLightDir: vec3f,
+     @location(3) varyingVertPos: vec3f,
 }
 
 @group(0) @binding(0) var texSampler:sampler;
@@ -58,10 +58,9 @@ fn estimateWaveNormal(
 
 @fragment
 fn main(
-   @location(3) tc:vec2f
+   input:FragmentInput
 )-> @location(0) vec4f
-{	var input:FragmentInput;
-    let fogColor = vec4f(0.0, 0.0, 0.2, 1.0);
+{	let fogColor = vec4f(0.0, 0.0, 0.2, 1.0);
 	let fogStart = f32(10.0);
 	let fogEnd = f32(300.0);
 	let dist = f32(length(input.varyingVertPos.xyz));
@@ -97,7 +96,8 @@ fn main(
     reflectColor = vec4((reflectColor.xyz * (ambient + diffuse) + 0.75*specular), 1.0);
     color = mix(refractColor, reflectColor, fresnel);
 
-	 return color;
+	 //return color;
+	 return vec4f(0.0, 0.25, 1.0, 1.0);
 }
 
 

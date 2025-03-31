@@ -64,45 +64,6 @@ context.configure({
 var depthLookup = 0.0;
 let lastTime = Date.now() / 800;
 
-//Plane Texture Setup
-const kTextureWidth = 14;
-const kTextureHeight = 16;
-const b = [0,   0,   0, 0];  // black
-const w = [  255,   255, 255, 255];  // white
-const textureData = new Uint8Array([
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-    w, b, w, b, w, b, w, b, w, b, w, b, w, b,
-    b, w, b, w, b, w, b, w, b, w, b, w, b, w,
-].flat());
-
-const texture = device.createTexture({
-    label: 'yellow F on red',
-    size: [kTextureWidth, kTextureHeight],
-    format: 'rgba8unorm',
-    usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST,
-});
-device.queue.writeTexture(
-    { texture },
-    textureData,
-    { bytesPerRow: kTextureWidth * 4 },
-    { width: kTextureWidth, height: kTextureHeight },
-);
-
 //----Shader Buffers
 
 const cubeVerticesBuffer = device.createBuffer({
@@ -398,30 +359,14 @@ const matrixBindGroupLayout1 = device.createBindGroupLayout({
     ],
 });
 
-const matrixBindGroupLayout2 = device.createBindGroupLayout({
-    label: 'matrix bind group layout 2',
-    entries: [
-        {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-    ],
-});
-
-
 //----Pipeline Layouts
-
-const reflectPipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [textureBindGroupLayout1, matrixBindGroupLayout2],
-});
 
 const refractPipelineLayout = device.createPipelineLayout({
     bindGroupLayouts: [textureBindGroupLayout2, lightMaterialBindGroupLayout, matrixBindGroupLayout1],
 });
 
 const CubeMapPipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [textureBindGroupLayout1, matrixBindGroupLayout2],
+    bindGroupLayouts: [textureBindGroupLayout1, matrixBindGroupLayout1],
 });
 
 const surfacePipelineLayout = device.createPipelineLayout({
@@ -435,7 +380,7 @@ const floorPipelineLayout = device.createPipelineLayout({
 //----Pipelines----
 const reflectionPipeline = device.createRenderPipeline({
     label: 'skybox reflection pipeline',
-    layout: reflectPipelineLayout,
+    layout: CubeMapPipelineLayout,
     vertex: {
         module: device.createShaderModule({
             label: 'cube map vert shader',
@@ -462,6 +407,7 @@ const reflectionPipeline = device.createRenderPipeline({
         targets: [
             {
                 format: 'rgba8unorm',
+                //format: presentationFormat,
             },
         ],
     },
@@ -525,6 +471,7 @@ const refractionPipeline = device.createRenderPipeline({
         targets: [
             {
                 format: 'rgba8unorm',
+                //format: presentationFormat,
             },
         ],
     },
@@ -702,8 +649,8 @@ const floorPipeline = device.createRenderPipeline({
         cullMode: 'none',
     },
     depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
+        depthWriteEnabled: false,
+        depthCompare: 'less-equal',
         format: 'depth24plus',
     },
 });
@@ -785,12 +732,6 @@ const cmUniformBuffer = device.createBuffer({
     size: matrixBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
-
-const pUniformBuffer = device.createBuffer({
-    size: matrixBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-
 
 // Light properties
 let initialLightLoc = [-10.0, 10.0, -50.0];
@@ -896,21 +837,6 @@ const cubeMapTextureBindGroup = device.createBindGroup({
     ],
 });
 
-const reflectMatrixBindGroup = device.createBindGroup({
-    label: 'reflection matrix bind group',
-    layout: matrixBindGroupLayout2,
-    entries: [
-        {
-            binding: 0,
-            resource: {
-                buffer: rUniformBuffer,
-                offset: 0,
-                size: matrixBufferSize,
-            },
-        },
-    ],
-});
-
 const noiseTextureBindGroup = device.createBindGroup({
     label: 'noise texture bind group',
     layout: textureBindGroupLayout2,
@@ -998,21 +924,6 @@ const MatrixBindGroup = device.createBindGroup({
     ],
 });
 
-const cubeMapMatrixBindGroup = device.createBindGroup({
-    label: 'cube map matrix bind group',
-    layout: matrixBindGroupLayout2,
-    entries: [
-        {
-            binding: 0,
-            resource: {
-                buffer: cmUniformBuffer,
-                offset: 0,
-                size: matrixBufferSize,
-            },
-        },
-    ],
-});
-
 const surfaceTextureBindGroup = device.createBindGroup({
     label: 'surface texture bind group',
     layout: textureBindGroupLayout3,
@@ -1042,21 +953,20 @@ const surfaceTextureBindGroup = device.createBindGroup({
     ],
 });
 
-
-
-
 //---- Render Pass Descriptors
 
 const reflectRenderPassDescriptor = {
     colorAttachments: [
         {
             view: reflectTexture.createView(),
+            //view: undefined,
             loadOp: 'clear',
             storeOp: 'store'
         }
     ],
     depthStencilAttachment: {
         view: reflectDepthTexture.createView(),
+        //view: depthTexture.createView(),
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -1067,41 +977,27 @@ const refractRenderPassDescriptor = {
     colorAttachments: [
         {
             view: refractTexture.createView(),
+            //view: undefined,
             loadOp: 'clear',
             storeOp: 'store'
         }
     ],
     depthStencilAttachment: {
         view: refractDepthTexture.createView(),
+        //view: depthTexture.createView(),
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
     },
 };
 
-const RenderPassDescriptor = {
+const renderPassDescriptor = {
     colorAttachments: [
         {
             view: context.getCurrentTexture().createView(),
             loadOp: 'load',
             storeOp: 'store'
         }
-    ],
-    depthStencilAttachment: {
-        view: depthTexture.createView(),
-        depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
-    },
-};
-
-const pRenderPassDescriptor = {
-    colorAttachments: [
-        {
-            view: undefined, // Assigned later
-            loadOp: 'load',
-            storeOp: 'store',
-        },
     ],
     depthStencilAttachment: {
         view: depthTexture.createView(),
@@ -1122,41 +1018,36 @@ device.queue.writeBuffer(
 );
 
 //Reflection Matrix Setup
-function getTransformationMatrixR() {
-    const modelViewProjectionMatrixR = mat4.create();
-    var viewMatrixR = mat4.identity();
-    mat4.translate(
-        viewMatrixR,
-        vec3.fromValues(0, -(0 - 2), 0),
-        viewMatrixR
-    );
+function getReflectionMatrices() {
+    var modelMatrix = mat4.scaling(vec3.fromValues(100, 100, 100));
+    var viewMatrix = mat4.identity();
+    var normMatrix = mat4.create();
+
     mat4.rotate(
-        viewMatrixR,
+        viewMatrix,
         vec3.fromValues(1, 0, 0),
-        15,
-        viewMatrixR,
+        -15,
+        viewMatrix,
     );
 
-    mat4.multiply(projectionMatrix, viewMatrixR, modelViewProjectionMatrixR);
-
-    return modelViewProjectionMatrixR;
+    return {
+        modelMatrixRf: modelMatrix,
+        viewMatrixRf: viewMatrix,
+        normMatrixRf: normMatrix,
+    }
 }
 
 function getRefractionMatrices() {
-    var modelMatrix = mat4.create();
-    var viewMatrix = mat4.create();
+    var modelMatrix = mat4.identity();
+    var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
     mat4.translate(
         viewMatrix,
-        vec3.fromValues(0, -(0 - 2), 0),
+        vec3.fromValues(0, -10, 0),
         viewMatrix
     );
-    mat4.rotate(
-        viewMatrix,
-        vec3.fromValues(1, 0, 0),
-        15,
-        viewMatrix,
-    );
+    mat4.invert(modelMatrix, normMatrix);
+    mat4.transpose(normMatrix, normMatrix);
 
     return {
         modelMatrixRf: modelMatrix,
@@ -1173,34 +1064,28 @@ function updateDepthLookup() {
     return depthLookup += elapsedTime * .0001;
 }
 
-//Skybox or Cube map Matrix setup
-function getTransformationMatrixCm() {
-    const modelViewProjectionMatrixCm = mat4.create();
-    const modelMatrix = mat4.scaling(vec3.fromValues(100, 100, 100));
-    const viewMatrixCm = mat4.identity();
-    mat4.multiply(
-        viewMatrixCm,
-        modelMatrix,
-        modelViewProjectionMatrixCm
-    );
-    mat4.multiply(
-        projectionMatrix,
-        modelViewProjectionMatrixCm,
-        modelViewProjectionMatrixCm
-    );
-    return modelViewProjectionMatrixCm;
+function getCubeMapMatrices() {
+    var modelMatrix = mat4.scaling(vec3.fromValues(100, 100, 100));
+    var viewMatrix = mat4.identity();
+    var normMatrix = mat4.create();
+
+    return {
+        modelMatrixCm: modelMatrix,
+        viewMatrixCm: viewMatrix,
+        normMatrixCm: normMatrix,
+    }
 }
 
 function getSurfaceMatrices() {
-    var modelMatrix = mat4.create();
-    var viewMatrix = mat4.create();
+    var modelMatrix = mat4.identity();
+    var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
     mat4.translate(
         viewMatrix,
         vec3.fromValues(0, 0, 0),
         viewMatrix
     );
-    mat4.invert(normMatrix, modelMatrix);
+    mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
     return {
@@ -1211,15 +1096,15 @@ function getSurfaceMatrices() {
 }
 
 function getFloorMatrices() {
-    var modelMatrix = mat4.create();
-    var viewMatrix = mat4.create();
+    var modelMatrix = mat4.identity();
+    var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
     mat4.translate(
         viewMatrix,
         vec3.fromValues(0, -10, 0),
         viewMatrix
     );
-    mat4.invert(normMatrix, modelMatrix);
+    mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
     return {
@@ -1229,44 +1114,37 @@ function getFloorMatrices() {
     }
 }
 
-//Plane Matrix setup
-function getTransformationMatrixP() {
-    const modelViewProjectionMatrixP = mat4.create();
-    var viewMatrixP = mat4.identity();
-
-    mat4.translate(
-        viewMatrixP,
-        vec3.fromValues(0, -35, 10),
-        viewMatrixP
-    );
-    mat4.rotate(
-        viewMatrixP,
-        vec3.fromValues(0, 1, 0),
-        0,
-        viewMatrixP
-    );
-
-    mat4.multiply(projectionMatrix, viewMatrixP, modelViewProjectionMatrixP);
-
-    return modelViewProjectionMatrixP;
-}
-
 //Render Pass Functions
 function reflectRenderPass(commandEncoder){
-    const modelViewProjectionMatrixR = getTransformationMatrixR();
+    const {modelMatrixRf, viewMatrixRf, normMatrixRf} = getReflectionMatrices();
+
     device.queue.writeBuffer(
-        rUniformBuffer,
+        viewMatBuffer,
         0,
-        modelViewProjectionMatrixR.buffer,
-        modelViewProjectionMatrixR.byteOffset,
-        modelViewProjectionMatrixR.byteLength
+        viewMatrixRf,
     );
+    device.queue.writeBuffer(
+        modelMatBuffer,
+        0,
+        modelMatrixRf,
+    );
+    device.queue.writeBuffer(
+        normMatBuffer,
+        0,
+        normMatrixRf,
+    );
+    /*
+    //For Testing
+    reflectRenderPassDescriptor.colorAttachments[0].view = context
+        .getCurrentTexture()
+        .createView();
+     */
 
     const rPassEncoder = commandEncoder.beginRenderPass(reflectRenderPassDescriptor);
     rPassEncoder.setPipeline(reflectionPipeline);
     rPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
     rPassEncoder.setBindGroup(0, cubeMapTextureBindGroup);
-    rPassEncoder.setBindGroup(1, reflectMatrixBindGroup);
+    rPassEncoder.setBindGroup(1, MatrixBindGroup);
     rPassEncoder.draw(cubeMapVertexCount);
     rPassEncoder.end();
 }
@@ -1298,6 +1176,9 @@ function refractRenderPass(commandEncoder){
         normMatrixRf,
     );
 
+    /*refractRenderPassDescriptor.colorAttachments[0].view = context
+        .getCurrentTexture()
+        .createView();*/
     const rPassEncoder = commandEncoder.beginRenderPass(refractRenderPassDescriptor);
     rPassEncoder.setPipeline(refractionPipeline);
     rPassEncoder.setVertexBuffer(0, planeVerticesBuffer);
@@ -1311,24 +1192,37 @@ function refractRenderPass(commandEncoder){
 }
 
 function cmRenderPass(commandEncoder){
-    const modelViewProjectionMatrixCm = getTransformationMatrixCm();
+
+    const {modelMatrixCm, viewMatrixCm, normMatrixCm} = getCubeMapMatrices();
+
+    //console.log("model:",modelMatrixCm);
+    //console.log("viewMatrixF:",viewMatrixCm);
+    //console.log("normMatrix:", normMatrixCm);
     device.queue.writeBuffer(
-        cmUniformBuffer,
+        viewMatBuffer,
         0,
-        modelViewProjectionMatrixCm.buffer,
-        modelViewProjectionMatrixCm.byteOffset,
-        modelViewProjectionMatrixCm.byteLength
+        viewMatrixCm,
+    );
+    device.queue.writeBuffer(
+        modelMatBuffer,
+        0,
+        modelMatrixCm,
+    );
+    device.queue.writeBuffer(
+        normMatBuffer,
+        0,
+        normMatrixCm,
     );
 
-    RenderPassDescriptor.colorAttachments[0].view = context
+    renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
 
-    const cmPassEncoder = commandEncoder.beginRenderPass(RenderPassDescriptor);
+    const cmPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
     cmPassEncoder.setPipeline(cubeMapPipeline);
     cmPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
     cmPassEncoder.setBindGroup(0, cubeMapTextureBindGroup);
-    cmPassEncoder.setBindGroup(1, cubeMapMatrixBindGroup);
+    cmPassEncoder.setBindGroup(1, MatrixBindGroup);
     cmPassEncoder.draw(cubeMapVertexCount);
     cmPassEncoder.end();
 }
@@ -1360,10 +1254,10 @@ function surfaceRenderPass(commandEncoder){
         normMatrixS,
     );
 
-    RenderPassDescriptor.colorAttachments[0].view = context
+    renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
-    const sPassEncoder = commandEncoder.beginRenderPass(RenderPassDescriptor);
+    const sPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
     sPassEncoder.setPipeline(surfacePipeline);
     sPassEncoder.setVertexBuffer(0, planeVerticesBuffer);
     sPassEncoder.setVertexBuffer(1, planeTexBuffer);
@@ -1378,6 +1272,9 @@ function surfaceRenderPass(commandEncoder){
 function floorRenderPass(commandEncoder){
     const {modelMatrixF, viewMatrixF, normMatrixF} = getFloorMatrices();
 
+    //console.log("model:",modelMatrixF);
+    //console.log("viewMatrixF:",viewMatrixF);
+    //console.log("normMatrixF:",normMatrixF);
     device.queue.writeBuffer(
         viewMatBuffer,
         0,
@@ -1394,11 +1291,11 @@ function floorRenderPass(commandEncoder){
         normMatrixF,
     );
 
-    RenderPassDescriptor.colorAttachments[0].view = context
+    renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
 
-    const pPassEncoder = commandEncoder.beginRenderPass(RenderPassDescriptor);
+    const pPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
     pPassEncoder.setPipeline(floorPipeline);
     pPassEncoder.setVertexBuffer(0, planeVerticesBuffer);
     pPassEncoder.setVertexBuffer(1, planeTexBuffer);
@@ -1416,8 +1313,8 @@ function frame() {
     reflectRenderPass(commandEncoder);
     refractRenderPass(commandEncoder);
     cmRenderPass(commandEncoder);
-    surfaceRenderPass(commandEncoder);
-    floorRenderPass(commandEncoder);
+    //surfaceRenderPass(commandEncoder);
+    //floorRenderPass(commandEncoder);
 
     device.queue.submit([commandEncoder.finish()]);
 
