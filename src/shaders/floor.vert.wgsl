@@ -16,13 +16,6 @@ struct Material
 	padding2: vec4f,
 };
 
-/*struct VertexOutput{
-@builtin(position) pos : vec4f,
-@location(0) varyingNormal:vec3f,
-@location(1) varyingLightDir:vec3f,
-@location(2) varyingVertPos:vec3f,
-@location(3) tc:vec2f,
-}*/
 
 struct VertexOutput{
     @builtin(position) pos : vec4f,

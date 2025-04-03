@@ -118,6 +118,7 @@ fn main(
 	let checkers = checkerboard(input.tc);
 
     return vec4f((checkers * (ambient + diffuse) + specular), 1.0);
+
 }
 
 

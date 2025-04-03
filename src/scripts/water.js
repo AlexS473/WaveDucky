@@ -57,6 +57,7 @@ const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 context.configure({
     device,
     format: presentationFormat,
+    alphaMode: 'premultiplied',
 });
 
 //Random Variables
@@ -641,6 +642,18 @@ const floorPipeline = device.createRenderPipeline({
         targets: [
             {
                 format: presentationFormat,
+                blend: {
+                    color: {
+                        srcFactor: "src-alpha",
+                        dstFactor: "one-minus-src-alpha",
+                        operation: "add",
+                    },
+                    alpha: {
+                        srcFactor: "one",
+                        dstFactor: "one-minus-src-alpha",
+                        operation: "add",
+                    }
+                }
             },
         ],
     },
@@ -701,35 +714,48 @@ const depthTexture = device.createTexture({
 
 //----Uniforms and Uniform Buffers
 const matrixBufferSize = 4 * 16;
-const rUniformBuffer = device.createBuffer({
-    size: matrixBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
 
-const projectionMatBuffer = device.createBuffer({
-    size: matrixBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-const modelMatBuffer = device.createBuffer({
-    size: matrixBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-const viewMatBuffer = device.createBuffer({
-    size: matrixBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-const normMatBuffer = device.createBuffer({
-    size: matrixBufferSize,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
+function createMatrixBuffer(){
+    return device.createBuffer({
+        size: matrixBufferSize,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+}
+
+const projectionMatBuffer = createMatrixBuffer();
+
+const reflectModelMatBuffer = createMatrixBuffer();
+
+const refractModelMatBuffer = createMatrixBuffer();
+
+const cmModelMatBuffer = createMatrixBuffer();
+
+const surfaceModelMatBuffer = createMatrixBuffer();
+
+const floorModelMatBuffer = createMatrixBuffer();
+
+const reflectViewMatBuffer = createMatrixBuffer();
+
+const refractViewMatBuffer = createMatrixBuffer();
+
+const cmViewMatBuffer = createMatrixBuffer();
+
+const surfaceViewMatBuffer = createMatrixBuffer();
+
+const floorViewMatBuffer = createMatrixBuffer();
+
+const reflectNormMatBuffer = createMatrixBuffer();
+
+const refractNormMatBuffer = createMatrixBuffer();
+
+const cmNormMatBuffer = createMatrixBuffer();
+
+const surfaceNormMatBuffer = createMatrixBuffer();
+
+const floorNormMatBuffer = createMatrixBuffer();
 
 const depthBuffer = device.createBuffer({
     size: 4,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-
-const cmUniformBuffer = device.createBuffer({
-    size: matrixBufferSize,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 
@@ -877,52 +903,64 @@ const LiMatBindGroup = device.createBindGroup({
     ],
 });
 
-const MatrixBindGroup = device.createBindGroup({
-    label: 'matrix bind group',
-    layout: matrixBindGroupLayout1,
-    entries: [
-        {
-            binding: 0,
-            resource: {
-                buffer: modelMatBuffer,
-                offset: 0,
-                size: matrixBufferSize,
-            }
-        },
-        {
-            binding: 1,
-            resource: {
-                buffer: viewMatBuffer,
-                offset: 0,
-                size: matrixBufferSize,
-            }
-        },
-        {
-            binding: 2,
-            resource: {
-                buffer: projectionMatBuffer,
-                offset: 0,
-                size: matrixBufferSize,
-            }
-        },
-        {
-            binding: 3,
-            resource: {
-                buffer: normMatBuffer,
-                offset: 0,
-                size: matrixBufferSize,
-            }
-        },
-        {
-            binding: 4,
-            resource: {
-                buffer: depthBuffer,
-                offset: 0,
-                size: 4,
-            }
-        },
-    ],
-});
+function createMatrixBindGroup(label, modelMatBuffer, viewMatBuffer, normMatBuffer) {
+    return device.createBindGroup({
+        label: label,
+        layout: matrixBindGroupLayout1,
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: modelMatBuffer,
+                    offset: 0,
+                    size: matrixBufferSize,
+                }
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: viewMatBuffer,
+                    offset: 0,
+                    size: matrixBufferSize,
+                }
+            },
+            {
+                binding: 2,
+                resource: {
+                    buffer: projectionMatBuffer,
+                    offset: 0,
+                    size: matrixBufferSize,
+                }
+            },
+            {
+                binding: 3,
+                resource: {
+                    buffer: normMatBuffer,
+                    offset: 0,
+                    size: matrixBufferSize,
+                }
+            },
+            {
+                binding: 4,
+                resource: {
+                    buffer: depthBuffer,
+                    offset: 0,
+                    size: 4,
+                }
+            },
+        ],
+    });
+}
+
+const reflectMatrixBindGroup = createMatrixBindGroup('reflection matrix bind group', reflectModelMatBuffer,reflectViewMatBuffer, reflectNormMatBuffer);
+
+const refractMatrixBindGroup = createMatrixBindGroup('refraction matrix bind group', refractModelMatBuffer,refractViewMatBuffer, refractNormMatBuffer);
+
+const cmMatrixBindGroup = createMatrixBindGroup('sky box matrix bind group', cmModelMatBuffer,cmViewMatBuffer, cmNormMatBuffer);
+
+const surfaceMatrixBindGroup = createMatrixBindGroup('surface matrix bind group', surfaceModelMatBuffer,surfaceViewMatBuffer, surfaceNormMatBuffer);
+
+const floorMatrixBindGroup = createMatrixBindGroup('floor matrix bind group', floorModelMatBuffer,floorViewMatBuffer, floorNormMatBuffer);
 
 const surfaceTextureBindGroup = device.createBindGroup({
     label: 'surface texture bind group',
@@ -995,6 +1033,7 @@ const renderPassDescriptor = {
     colorAttachments: [
         {
             view: context.getCurrentTexture().createView(),
+            clearValue: [0, 0, 0, 0],
             loadOp: 'load',
             storeOp: 'store'
         }
@@ -1069,6 +1108,12 @@ function getCubeMapMatrices() {
     var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
 
+    mat4.translate(
+        viewMatrix,
+        vec3.fromValues(0, 0, 0),
+        viewMatrix
+    );
+
     return {
         modelMatrixCm: modelMatrix,
         viewMatrixCm: viewMatrix,
@@ -1119,17 +1164,17 @@ function reflectRenderPass(commandEncoder){
     const {modelMatrixRf, viewMatrixRf, normMatrixRf} = getReflectionMatrices();
 
     device.queue.writeBuffer(
-        viewMatBuffer,
+        reflectViewMatBuffer,
         0,
         viewMatrixRf,
     );
     device.queue.writeBuffer(
-        modelMatBuffer,
+        reflectModelMatBuffer,
         0,
         modelMatrixRf,
     );
     device.queue.writeBuffer(
-        normMatBuffer,
+        reflectNormMatBuffer,
         0,
         normMatrixRf,
     );
@@ -1144,7 +1189,7 @@ function reflectRenderPass(commandEncoder){
     rPassEncoder.setPipeline(reflectionPipeline);
     rPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
     rPassEncoder.setBindGroup(0, cubeMapTextureBindGroup);
-    rPassEncoder.setBindGroup(1, MatrixBindGroup);
+    rPassEncoder.setBindGroup(1, reflectMatrixBindGroup);
     rPassEncoder.draw(cubeMapVertexCount);
     rPassEncoder.end();
 }
@@ -1161,17 +1206,17 @@ function refractRenderPass(commandEncoder){
     const {modelMatrixRf, viewMatrixRf, normMatrixRf} = getRefractionMatrices();
 
     device.queue.writeBuffer(
-        viewMatBuffer,
+        refractViewMatBuffer,
         0,
         viewMatrixRf,
     );
     device.queue.writeBuffer(
-        modelMatBuffer,
+        refractModelMatBuffer,
         0,
         modelMatrixRf,
     );
     device.queue.writeBuffer(
-        normMatBuffer,
+        refractNormMatBuffer,
         0,
         normMatrixRf,
     );
@@ -1186,30 +1231,30 @@ function refractRenderPass(commandEncoder){
     rPassEncoder.setVertexBuffer(2, planeNormBuffer);
     rPassEncoder.setBindGroup(0, noiseTextureBindGroup);
     rPassEncoder.setBindGroup(1, LiMatBindGroup);
-    rPassEncoder.setBindGroup(2, MatrixBindGroup);
+    rPassEncoder.setBindGroup(2, refractMatrixBindGroup);
     rPassEncoder.draw(planeVertexCount);
     rPassEncoder.end();
 }
 
 function cmRenderPass(commandEncoder){
-
+    //console.log("Rendering Cubemap...");
     const {modelMatrixCm, viewMatrixCm, normMatrixCm} = getCubeMapMatrices();
 
     //console.log("model:",modelMatrixCm);
     //console.log("viewMatrixF:",viewMatrixCm);
     //console.log("normMatrix:", normMatrixCm);
     device.queue.writeBuffer(
-        viewMatBuffer,
+        cmViewMatBuffer,
         0,
         viewMatrixCm,
     );
     device.queue.writeBuffer(
-        modelMatBuffer,
+        cmModelMatBuffer,
         0,
         modelMatrixCm,
     );
     device.queue.writeBuffer(
-        normMatBuffer,
+        cmNormMatBuffer,
         0,
         normMatrixCm,
     );
@@ -1222,7 +1267,7 @@ function cmRenderPass(commandEncoder){
     cmPassEncoder.setPipeline(cubeMapPipeline);
     cmPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
     cmPassEncoder.setBindGroup(0, cubeMapTextureBindGroup);
-    cmPassEncoder.setBindGroup(1, MatrixBindGroup);
+    cmPassEncoder.setBindGroup(1, cmMatrixBindGroup);
     cmPassEncoder.draw(cubeMapVertexCount);
     cmPassEncoder.end();
 }
@@ -1239,17 +1284,17 @@ function surfaceRenderPass(commandEncoder){
     const {modelMatrixS, viewMatrixS, normMatrixS} = getSurfaceMatrices();
 
     device.queue.writeBuffer(
-        viewMatBuffer,
+        surfaceViewMatBuffer,
         0,
         viewMatrixS,
     );
     device.queue.writeBuffer(
-        modelMatBuffer,
+        surfaceModelMatBuffer,
         0,
         modelMatrixS,
     );
     device.queue.writeBuffer(
-        normMatBuffer,
+        surfaceNormMatBuffer,
         0,
         normMatrixS,
     );
@@ -1264,29 +1309,30 @@ function surfaceRenderPass(commandEncoder){
     sPassEncoder.setVertexBuffer(2, planeNormBuffer);
     sPassEncoder.setBindGroup(0, surfaceTextureBindGroup);
     sPassEncoder.setBindGroup(1, LiMatBindGroup);
-    sPassEncoder.setBindGroup(2, MatrixBindGroup);
+    sPassEncoder.setBindGroup(2, surfaceMatrixBindGroup);
     sPassEncoder.draw(planeVertexCount);
     sPassEncoder.end();
 }
 
 function floorRenderPass(commandEncoder){
+    //console.log("Rendering Floor...");
     const {modelMatrixF, viewMatrixF, normMatrixF} = getFloorMatrices();
 
     //console.log("model:",modelMatrixF);
     //console.log("viewMatrixF:",viewMatrixF);
     //console.log("normMatrixF:",normMatrixF);
     device.queue.writeBuffer(
-        viewMatBuffer,
+        floorViewMatBuffer,
         0,
         viewMatrixF,
     );
     device.queue.writeBuffer(
-        modelMatBuffer,
+        floorModelMatBuffer,
         0,
         modelMatrixF,
     );
     device.queue.writeBuffer(
-        normMatBuffer,
+        floorNormMatBuffer,
         0,
         normMatrixF,
     );
@@ -1302,7 +1348,7 @@ function floorRenderPass(commandEncoder){
     pPassEncoder.setVertexBuffer(2, planeNormBuffer);
     pPassEncoder.setBindGroup(0, noiseTextureBindGroup);
     pPassEncoder.setBindGroup(1, LiMatBindGroup);
-    pPassEncoder.setBindGroup(2, MatrixBindGroup);
+    pPassEncoder.setBindGroup(2, floorMatrixBindGroup);
     pPassEncoder.draw(planeVertexCount);
     pPassEncoder.end();
 }
@@ -1313,8 +1359,8 @@ function frame() {
     reflectRenderPass(commandEncoder);
     refractRenderPass(commandEncoder);
     cmRenderPass(commandEncoder);
-    //surfaceRenderPass(commandEncoder);
-    //floorRenderPass(commandEncoder);
+    surfaceRenderPass(commandEncoder);
+    floorRenderPass(commandEncoder);
 
     device.queue.submit([commandEncoder.finish()]);
 

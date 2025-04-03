@@ -96,8 +96,7 @@ fn main(
     reflectColor = vec4((reflectColor.xyz * (ambient + diffuse) + 0.75*specular), 1.0);
     color = mix(refractColor, reflectColor, fresnel);
 
-	 //return color;
-	 return vec4f(0.0, 0.25, 1.0, 1.0);
+	 return color;
 }
 
 
