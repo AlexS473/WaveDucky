@@ -7,7 +7,6 @@ import {
 import {
     cubeMapVertexPositions,
     cubeMapVertexSize,
-    cubeMapUVOffset,
     cubeMapPositionOffset,
     cubeMapVertexCount,
 } from '../verticies/cube.js';
@@ -130,83 +129,11 @@ const refractDepthTexture = device.createTexture({
     usage: GPUTextureUsage.RENDER_ATTACHMENT
 });
 
-//---LET'S MAKE SOME NOISE
-
 let noiseHeight = 256;
 let noiseWidth = 256;
 let noiseDepth = 256;
 
 const noiseData = new Float32Array(noiseWidth * noiseHeight * noiseDepth);
-
-function noiseIndex(x, y, z) {
-    return x * (noiseHeight * noiseDepth) + y * noiseDepth + z;
-}
-
-function smooth(zoom, x1, y1, z1) {
-
-    let fractX = x1 - Math.floor(x1);
-    let fractY = y1 - Math.floor(y1);
-    let fractZ = z1 - Math.floor(z1);
-
-    let x2 = x1 - 1;
-    if (x2 < 0) x2 = Math.round(noiseWidth / zoom) - 1;
-    let y2 = y1 - 1;
-    if (y2 < 0) y2 = Math.round(noiseHeight / zoom) - 1;
-    let z2 = z1 - 1;
-    if (z2 < 0) z2 = Math.round(noiseDepth / zoom) - 1;
-
-    let value = 0.0;
-    value += fractX * fractY * fractZ * noiseData[noiseIndex(Math.floor(x1), Math.floor(y1), Math.floor(z1))];
-    value += (1.0 - fractX) * fractY * fractZ * noiseData[noiseIndex(Math.floor(x2), Math.floor(y1), Math.floor(z1))];
-    value += fractX * (1.0 - fractY) * fractZ * noiseData[noiseIndex(Math.floor(x1), Math.floor(y2), Math.floor(z1))];
-    value += (1.0 - fractX) * (1.0 - fractY) * fractZ * noiseData[noiseIndex(Math.floor(x2), Math.floor(y2), Math.floor(z1))];
-
-    value += fractX * fractY * (1.0 - fractZ) * noiseData[noiseIndex(Math.floor(x1), Math.floor(y1), Math.floor(z2))];
-    value += (1.0 - fractX) * fractY * (1.0 - fractZ) * noiseData[noiseIndex(Math.floor(x2), Math.floor(y1), Math.floor(z2))];
-    value += fractX * (1.0 - fractY) * (1.0 - fractZ) * noiseData[noiseIndex(Math.floor(x1), Math.floor(y2), Math.floor(z2))];
-    value += (1.0 - fractX) * (1.0 - fractY) * (1.0 - fractZ) * noiseData[noiseIndex(Math.floor(x2), Math.floor(y2), Math.floor(z2))];
-
-    return value;
-}
-
-
-function turbulence(x, y, z, maxZoom) {
-    let sum = (Math.sin((1.0 / 512.0) * (8 * Math.PI) * (x + z - 4 * y)) + 1) * 8.0;
-    let zoom = maxZoom;
-
-    while (zoom >= 0.9) {
-        sum += smooth(zoom, x / zoom, y / zoom, z / zoom) * zoom;
-        zoom /= 2.0;
-    }
-
-    return (128.0 * sum) / maxZoom;
-}
-
-function fillDataArray(data, noiseHeight, noiseWidth, noiseDepth) {
-    let maxZoom = 32.0;
-    let noise = new Float32Array(noiseWidth * noiseHeight * noiseDepth);
-
-    for (let i = 0; i < noiseWidth; i++) {
-        for (let j = 0; j < noiseHeight; j++) {
-            for (let k = 0; k < noiseDepth; k++) {
-                let index = i * (noiseHeight * noiseDepth) + j * noiseDepth + k;
-                noise[index] = Math.random();
-            }
-        }
-    }
-
-    for (let i = 0; i < noiseHeight; i++) {
-        for (let j = 0; j < noiseWidth; j++) {
-            for (let k = 0; k < noiseDepth; k++) {
-                let index = i * (noiseWidth * noiseDepth * 4) + j * (noiseDepth * 4) + k * 4;
-                let turbulenceValue = turbulence(i, j, k, maxZoom); // Ensure this function is defined
-                data[index] = data[index + 1] = data[index + 2] = Math.floor(turbulenceValue);
-                data[index + 3] = 255;
-            }
-        }
-    }
-}
-
 fillDataArray(noiseData, noiseHeight, noiseWidth, noiseDepth);
 
 const noiseTexture = device.createTexture({
@@ -234,154 +161,23 @@ device.queue.writeTexture(
     },
 );
 
-//----BindGroupLayouts
-const textureBindGroupLayout1 = device.createBindGroupLayout({
-    label: 'texture bind group layout 1',
-    entries: [
-        {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            sampler: {},
-        },
-        {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            texture: {
-                sampleType: 'float',
-                viewDimension: 'cube',
-                multisampled: false,
-            },
-        },
-    ],
-});
+const { textureBindGroupLayout1,
+        textureBindGroupLayout2,
+        textureBindGroupLayout3,
+        lightMaterialBindGroupLayout,
+        matrixBindGroupLayout   } = createBindLayouts(device);
 
-const textureBindGroupLayout2 = device.createBindGroupLayout({
-    label: 'texture bind group layout 2',
-    entries: [
-        {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            sampler: {},
-        },
-        {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            texture: {
-                sampleType: 'float',
-                viewDimension: '3d',
-                multisampled: false,
-            },
-        },
-    ],
-});
-
-const textureBindGroupLayout3 = device.createBindGroupLayout({
-    label: 'texture bind group layout 3',
-    entries: [
-        {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            sampler: {},
-        },
-        {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            texture: {
-                sampleType: 'float',
-                viewDimension: '3d',
-                multisampled: false,
-            },
-        },
-        {
-            binding: 2,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            texture: {
-                sampleType: 'float',
-                viewDimension: '2d',
-                multisampled: false,
-            },
-        },
-        {
-            binding: 3,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            texture: {
-                sampleType: 'float',
-                viewDimension: '2d',
-                multisampled: false,
-            },
-        },
-    ],
-});
-
-const lightMaterialBindGroupLayout = device.createBindGroupLayout({
-    label: 'light mat bind group layout',
-    entries: [
-        {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-        {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-    ],
-});
-
-const matrixBindGroupLayout1 = device.createBindGroupLayout({
-    label: 'matrix bind group layout 1',
-    entries: [
-        {
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-        {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-        {
-            binding: 2,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-        {
-            binding: 3,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-        {
-            binding: 4,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform' },
-        },
-    ],
-});
-
-//----Pipeline Layouts
-
-const refractPipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [textureBindGroupLayout2, lightMaterialBindGroupLayout, matrixBindGroupLayout1],
-});
-
-const CubeMapPipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [textureBindGroupLayout1, matrixBindGroupLayout1],
-});
-
-const surfacePipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [textureBindGroupLayout3, lightMaterialBindGroupLayout, matrixBindGroupLayout1],
-});
-
-const floorPipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [textureBindGroupLayout2, lightMaterialBindGroupLayout, matrixBindGroupLayout1],
-});
+const {
+    refractPipelineLayout,
+    cubeMapPipelineLayout,
+    surfacePipelineLayout,
+    floorPipelineLayout
+} = createPipelineLayouts(device);
 
 //----Pipelines----
 const reflectionPipeline = device.createRenderPipeline({
     label: 'skybox reflection pipeline',
-    layout: CubeMapPipelineLayout,
+    layout: cubeMapPipelineLayout,
     vertex: {
         module: device.createShaderModule({
             label: 'cube map vert shader',
@@ -489,7 +285,7 @@ const refractionPipeline = device.createRenderPipeline({
 
 const cubeMapPipeline = device.createRenderPipeline({
     label: 'skybox pipeline',
-    layout: CubeMapPipelineLayout,
+    layout: cubeMapPipelineLayout,
     vertex: {
         module: device.createShaderModule({
             label: 'cube map vert shader',
@@ -710,8 +506,6 @@ const depthTexture = device.createTexture({
     usage: GPUTextureUsage.RENDER_ATTACHMENT,
 });
 
-
-
 //----Uniforms and Uniform Buffers
 const matrixBufferSize = 4 * 16;
 
@@ -906,7 +700,7 @@ const LiMatBindGroup = device.createBindGroup({
 function createMatrixBindGroup(label, modelMatBuffer, viewMatBuffer, normMatBuffer) {
     return device.createBindGroup({
         label: label,
-        layout: matrixBindGroupLayout1,
+        layout: matrixBindGroupLayout,
         entries: [
             {
                 binding: 0,
@@ -1069,6 +863,7 @@ function getReflectionMatrices() {
         viewMatrix,
     );
 
+    viewMatrix = updateViewMatrix(direction, viewMatrix);
     return {
         modelMatrixRf: modelMatrix,
         viewMatrixRf: viewMatrix,
@@ -1087,6 +882,7 @@ function getRefractionMatrices() {
     );
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
+    viewMatrix = updateViewMatrix(direction, viewMatrix);
 
     return {
         modelMatrixRf: modelMatrix,
@@ -1113,6 +909,7 @@ function getCubeMapMatrices() {
         vec3.fromValues(0, 0, 0),
         viewMatrix
     );
+    viewMatrix = updateViewMatrix(direction, viewMatrix);
 
     return {
         modelMatrixCm: modelMatrix,
@@ -1132,6 +929,7 @@ function getSurfaceMatrices() {
     );
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
+    viewMatrix = updateViewMatrix(direction, viewMatrix);
 
     return {
         modelMatrixS: modelMatrix,
@@ -1152,6 +950,7 @@ function getFloorMatrices() {
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
+    viewMatrix = updateViewMatrix(direction, viewMatrix);
     return {
         modelMatrixF: modelMatrix,
         viewMatrixF: viewMatrix,
@@ -1159,15 +958,33 @@ function getFloorMatrices() {
     }
 }
 
+function getDuckMatrices(direction) {
+    var modelMatrix = mat4.identity();
+    var normMatrix = mat4.create();
+    mat4.translate(
+        modelMatrix,
+        vec3.fromValues(0, 0, 0),
+        modelMatrix
+    );
+    mat4.rotate(
+        modelMatrix,
+        vec3.fromValues(1, 1, 0),
+        1.5,
+        modelMatrix
+    );
+    mat4.invert(modelMatrix, normMatrix);
+    mat4.transpose(normMatrix, normMatrix);
+
+    return {
+        modelMatrixD: modelMatrix,
+        normMatrixD: normMatrix,
+    }
+}
+
 //Render Pass Functions
 function reflectRenderPass(commandEncoder){
-    const {modelMatrixRf, viewMatrixRf, normMatrixRf} = getReflectionMatrices();
+    const {modelMatrixRf, normMatrixRf} = getReflectionMatrices();
 
-    device.queue.writeBuffer(
-        reflectViewMatBuffer,
-        0,
-        viewMatrixRf,
-    );
     device.queue.writeBuffer(
         reflectModelMatBuffer,
         0,
@@ -1353,7 +1170,54 @@ function floorRenderPass(commandEncoder){
     pPassEncoder.end();
 }
 
+var direction = 0;
+var lastAxis= vec3.create(0,0,1);
+var logicalTime = 0;
+var lastFrameTime = Date.now() / 1000;
+
+
+function updateViewMatrix(direction, viewMatrix){
+    const now = Date.now() / 1000;
+    const elapsedTime = now - lastFrameTime;
+    lastFrameTime = now;
+
+    if (direction !== 0){
+        logicalTime -= elapsedTime;
+        lastAxis = vec3.normalize([
+            Math.sin(logicalTime * -direction),
+            Math.cos(logicalTime * direction),
+            0
+        ]);
+    }
+
+    mat4.rotate(
+        viewMatrix,
+        lastAxis,
+        1,
+        viewMatrix
+    );
+    return viewMatrix;
+}
+
+window.addEventListener("keydown", (event) => {
+
+    if (event.code == 'ArrowLeft') {
+        direction = -1;
+    }
+    if (event.code == 'ArrowRight') {
+        direction = 1;
+    }
+});
+
+window.addEventListener("keyup", (event) => {
+
+    if (event.code == 'ArrowLeft'|| event.code == 'ArrowRight'){
+        direction = 0;
+    }
+});
+
 function frame() {
+
     const commandEncoder = device.createCommandEncoder();
 
     reflectRenderPass(commandEncoder);
