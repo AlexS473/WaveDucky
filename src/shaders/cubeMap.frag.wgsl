@@ -15,13 +15,5 @@ fn main(
       cubemapVec.z *= -1;
 
       let sampledColor = textureSample(myTexture, mySampler, cubemapVec);
-
-      /*var fragColor = select(
-        textureSample(myTexture, mySampler, cubemapVec),
-        vec4f(0, 0, .2, 1),
-        altitude < .47
-        );*/
-
-      //return fragColor;
       return sampledColor;
 }

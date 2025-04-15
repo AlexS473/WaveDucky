@@ -135,6 +135,10 @@ let noiseDepth = 256;
 
 const noiseData = new Float32Array(noiseWidth * noiseHeight * noiseDepth);
 fillDataArray(noiseData, noiseHeight, noiseWidth, noiseDepth);
+for (let i = 0; i < noiseData.length; i++) {
+    noiseData[i] = Math.pow(noiseData[i] / 255.0, 2.2); // gamma correction
+}
+console.log(noiseData);
 
 const noiseTexture = device.createTexture({
     label: 'noise texture',
@@ -375,6 +379,18 @@ const surfacePipeline = device.createRenderPipeline({
         targets: [
             {
                 format: presentationFormat,
+                blend: {
+                    color: {
+                        srcFactor: "src-alpha",
+                        dstFactor: "one-minus-src-alpha",
+                        operation: "add",
+                    },
+                    alpha: {
+                        srcFactor: "one",
+                        dstFactor: "one-minus-src-alpha",
+                        operation: "add",
+                    }
+                }
             },
         ],
     },
@@ -856,14 +872,14 @@ function getReflectionMatrices() {
     var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
 
-    mat4.rotate(
-        viewMatrix,
-        vec3.fromValues(1, 0, 0),
-        -15,
-        viewMatrix,
+    mat4.lookAt(
+        vec3.fromValues(0, 0, -10),
+        vec3.fromValues(0, 0, 0),
+        vec3.fromValues(0.0, 1, 0),
+        viewMatrix
     );
 
-    viewMatrix = updateViewMatrix(direction, viewMatrix);
+    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
     return {
         modelMatrixRf: modelMatrix,
         viewMatrixRf: viewMatrix,
@@ -875,14 +891,23 @@ function getRefractionMatrices() {
     var modelMatrix = mat4.identity();
     var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
+
     mat4.translate(
-        viewMatrix,
+        modelMatrix,
         vec3.fromValues(0, -10, 0),
+        modelMatrix
+    );
+    mat4.lookAt(
+        vec3.fromValues(0, 50, 1),
+        vec3.fromValues(0, -10, 0),
+        vec3.fromValues(0, 1, 0),
         viewMatrix
     );
+    mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
-    viewMatrix = updateViewMatrix(direction, viewMatrix);
+
+    viewMatrix = updateViewMatrix(directionX, -directionY, viewMatrix);
 
     return {
         modelMatrixRf: modelMatrix,
@@ -896,7 +921,8 @@ function updateDepthLookup() {
     const elapsedTime = now - lastTime;
     lastTime = now;
 
-    return depthLookup += elapsedTime * .0001;
+    //return depthLookup += elapsedTime * .0001; //Orginal
+    return depthLookup = (Math.sin(now * 0.005) + 1.0) * 0.5;
 }
 
 function getCubeMapMatrices() {
@@ -904,12 +930,14 @@ function getCubeMapMatrices() {
     var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
 
-    mat4.translate(
-        viewMatrix,
+    mat4.lookAt(
+        vec3.fromValues(0, 0, -10),
         vec3.fromValues(0, 0, 0),
+        vec3.fromValues(0.0, 1, 0),
         viewMatrix
     );
-    viewMatrix = updateViewMatrix(direction, viewMatrix);
+
+    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
 
     return {
         modelMatrixCm: modelMatrix,
@@ -922,14 +950,22 @@ function getSurfaceMatrices() {
     var modelMatrix = mat4.identity();
     var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
-    mat4.translate(
-        viewMatrix,
-        vec3.fromValues(0, 0, 0),
-        viewMatrix
-    );
+
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
-    viewMatrix = updateViewMatrix(direction, viewMatrix);
+
+    mat4.lookAt(
+        vec3.fromValues(0, 50, 1),
+        vec3.fromValues(0, 0, 0),
+        vec3.fromValues(0.0, 1, 0),
+        viewMatrix
+    );
+    mat4.rotateX(
+        viewMatrix,
+        -90 * Math.PI/180,
+        viewMatrix
+    )
+    viewMatrix = updateViewMatrix(directionX, -directionY, viewMatrix);
 
     return {
         modelMatrixS: modelMatrix,
@@ -942,15 +978,23 @@ function getFloorMatrices() {
     var modelMatrix = mat4.identity();
     var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
+
     mat4.translate(
-        viewMatrix,
+        modelMatrix,
         vec3.fromValues(0, -10, 0),
+        modelMatrix
+    );
+    mat4.lookAt(
+        vec3.fromValues(0, 50, 1),
+        vec3.fromValues(0, -10, 0),
+        vec3.fromValues(0, 1, 0),
         viewMatrix
     );
+    mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
-    viewMatrix = updateViewMatrix(direction, viewMatrix);
+    viewMatrix = updateViewMatrix(directionX, -directionY, viewMatrix);
     return {
         modelMatrixF: modelMatrix,
         viewMatrixF: viewMatrix,
@@ -983,7 +1027,7 @@ function getDuckMatrices(direction) {
 
 //Render Pass Functions
 function reflectRenderPass(commandEncoder){
-    const {modelMatrixRf, normMatrixRf} = getReflectionMatrices();
+    const {modelMatrixRf, viewMatrixRf, normMatrixRf} = getReflectionMatrices();
 
     device.queue.writeBuffer(
         reflectModelMatBuffer,
@@ -991,16 +1035,20 @@ function reflectRenderPass(commandEncoder){
         modelMatrixRf,
     );
     device.queue.writeBuffer(
+        reflectViewMatBuffer,
+        0,
+        viewMatrixRf,
+    );
+    device.queue.writeBuffer(
         reflectNormMatBuffer,
         0,
         normMatrixRf,
     );
-    /*
+
     //For Testing
-    reflectRenderPassDescriptor.colorAttachments[0].view = context
+    /*reflectRenderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
-        .createView();
-     */
+        .createView();*/
 
     const rPassEncoder = commandEncoder.beginRenderPass(reflectRenderPassDescriptor);
     rPassEncoder.setPipeline(reflectionPipeline);
@@ -1100,6 +1148,10 @@ function surfaceRenderPass(commandEncoder){
 
     const {modelMatrixS, viewMatrixS, normMatrixS} = getSurfaceMatrices();
 
+    //console.log("model:",modelMatrixS);
+    //console.log("viewMatrix:",viewMatrixS);
+    //console.log("normMatrix:",normMatrixS);
+
     device.queue.writeBuffer(
         surfaceViewMatBuffer,
         0,
@@ -1133,6 +1185,12 @@ function surfaceRenderPass(commandEncoder){
 
 function floorRenderPass(commandEncoder){
     //console.log("Rendering Floor...");
+    depthLookup = updateDepthLookup();
+    device.queue.writeBuffer(
+        depthBuffer,
+        0,
+        new Float32Array([depthLookup]),
+    );
     const {modelMatrixF, viewMatrixF, normMatrixF} = getFloorMatrices();
 
     //console.log("model:",modelMatrixF);
@@ -1170,30 +1228,37 @@ function floorRenderPass(commandEncoder){
     pPassEncoder.end();
 }
 
-var direction = 0;
-var lastAxis= vec3.create(0,0,1);
+var directionX = 0;
+var directionY = 0;
+var lastAxisX= 0;
+var lastAxisY= 0;
 var logicalTime = 0;
 var lastFrameTime = Date.now() / 1000;
 
 
-function updateViewMatrix(direction, viewMatrix){
+function updateViewMatrix(directionX, directionY, viewMatrix){
     const now = Date.now() / 1000;
     const elapsedTime = now - lastFrameTime;
     lastFrameTime = now;
 
-    if (direction !== 0){
+    if (directionX !== 0){
         logicalTime -= elapsedTime;
-        lastAxis = vec3.normalize([
-            Math.sin(logicalTime * -direction),
-            Math.cos(logicalTime * direction),
-            0
-        ]);
+        lastAxisX = logicalTime * directionX;
+    }
+    if (directionY !== 0){
+        logicalTime -= elapsedTime;
+        lastAxisY = logicalTime * directionY;
     }
 
-    mat4.rotate(
+    mat4.rotateY(
         viewMatrix,
-        lastAxis,
-        1,
+        lastAxisX,
+        viewMatrix
+    );
+
+    mat4.rotateX(
+        viewMatrix,
+        lastAxisY,
         viewMatrix
     );
     return viewMatrix;
@@ -1201,18 +1266,31 @@ function updateViewMatrix(direction, viewMatrix){
 
 window.addEventListener("keydown", (event) => {
 
-    if (event.code == 'ArrowLeft') {
-        direction = -1;
+    if (event.code === 'ArrowLeft') {
+        directionX = -1;
     }
-    if (event.code == 'ArrowRight') {
-        direction = 1;
+    if (event.code === 'ArrowRight') {
+        directionX = 1;
+    }
+
+    if (event.code === 'ArrowDown') {
+        directionY = -1;
+    }
+    if (event.code === 'ArrowUp') {
+        directionY = 1;
     }
 });
 
 window.addEventListener("keyup", (event) => {
 
-    if (event.code == 'ArrowLeft'|| event.code == 'ArrowRight'){
-        direction = 0;
+    if (
+        event.code === 'ArrowLeft'||
+        event.code === 'ArrowRight' ||
+        event.code === 'ArrowUp'||
+        event.code === 'ArrowDown'
+    ){
+        directionX = 0;
+        directionY = 0;
     }
 });
 

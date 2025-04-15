@@ -22,6 +22,7 @@ struct VertexOutput{
      @location(1) varyingNormal: vec3f,
      @location(2) varyingLightDir: vec3f,
      @location(3) varyingVertPos: vec3f,
+     @location(4) glp: vec4f,
 }
 
 @group(0) @binding(0) var texSampler:sampler;
@@ -52,6 +53,6 @@ fn main(
 
 	output.tc = texCoord;
 	output.pos = p_matrix * v_matrix * m_matrix * vec4(position,1.0);
-	output.pos.z = 0.1;
+	output.glp = output.pos;
 	return output;
 }

@@ -56,7 +56,7 @@ fn estimateWaveNormal(
 
 fn checkerboard(tc:vec2f) -> vec3f
 {
-    let estNcb = vec3f(estimateWaveNormal(.05, 32.0, 0.05, tc));
+    let estNcb = vec3f(estimateWaveNormal(.02, 1.0, 0.05, tc));
 
 	let distortStrength = f32(0.1);
 
@@ -117,7 +117,7 @@ fn main(
 	let specular = (light.specular.xyz * material.specular.xyz * pow(max(cosPhi,0.0), material.shininess));
 	let checkers = checkerboard(input.tc);
 
-    return vec4f((checkers * (ambient + diffuse) + specular), 1.0);
+     return vec4f((checkers * (ambient + diffuse) + specular), 1.0);
 
 }
 
