@@ -873,9 +873,9 @@ function getReflectionMatrices() {
     var normMatrix = mat4.create();
 
     mat4.lookAt(
-        vec3.fromValues(0, 0, -10),
-        vec3.fromValues(0, 0, 0),
-        vec3.fromValues(0.0, 1, 0),
+        vec3.fromValues(0, 80, 0),     // eye directly above
+        vec3.fromValues(0, 0, 0),       // looking straight down
+        vec3.fromValues(0, 0, 1),      // up is -Z so "top" stays top
         viewMatrix
     );
 
@@ -898,16 +898,16 @@ function getRefractionMatrices() {
         modelMatrix
     );
     mat4.lookAt(
-        vec3.fromValues(0, 50, 1),
-        vec3.fromValues(0, -10, 0),
-        vec3.fromValues(0, 1, 0),
+        vec3.fromValues(0, 80, 0),     // eye directly above
+        vec3.fromValues(0, 0, 0),       // looking straight down
+        vec3.fromValues(0, 0, -1),      // up is -Z so "top" stays top
         viewMatrix
     );
-    mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);
+    /*mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);*/
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
-    viewMatrix = updateViewMatrix(directionX, -directionY, viewMatrix);
+    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
 
     return {
         modelMatrixRf: modelMatrix,
@@ -931,7 +931,7 @@ function getCubeMapMatrices() {
     var normMatrix = mat4.create();
 
     mat4.lookAt(
-        vec3.fromValues(0, 0, -10),
+        vec3.fromValues(0, 50, -10),
         vec3.fromValues(0, 0, 0),
         vec3.fromValues(0.0, 1, 0),
         viewMatrix
@@ -948,24 +948,27 @@ function getCubeMapMatrices() {
 
 function getSurfaceMatrices() {
     var modelMatrix = mat4.identity();
+    //var modelMatrix = mat4.scaling(vec3.fromValues(100, 100, 100));
     var viewMatrix = mat4.identity();
     var normMatrix = mat4.create();
 
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
+    mat4.rotateX(modelMatrix, -Math.PI / 2, modelMatrix);
+
     mat4.lookAt(
-        vec3.fromValues(0, 50, 1),
-        vec3.fromValues(0, 0, 0),
-        vec3.fromValues(0.0, 1, 0),
+        vec3.fromValues(0, 50, 0),     // eye directly above
+        vec3.fromValues(0, 0, 0),       // looking straight down
+        vec3.fromValues(0, 0, -1),      // up is -Z so "top" stays top
         viewMatrix
     );
-    mat4.rotateX(
+    /*mat4.rotateX(
         viewMatrix,
         -90 * Math.PI/180,
         viewMatrix
-    )
-    viewMatrix = updateViewMatrix(directionX, -directionY, viewMatrix);
+    )*/
+    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
 
     return {
         modelMatrixS: modelMatrix,
@@ -985,16 +988,16 @@ function getFloorMatrices() {
         modelMatrix
     );
     mat4.lookAt(
-        vec3.fromValues(0, 50, 1),
-        vec3.fromValues(0, -10, 0),
-        vec3.fromValues(0, 1, 0),
+        vec3.fromValues(0, 100, 100),    // eye: elevated & pulled back
+        vec3.fromValues(0, 0, 0),        // target: center of scene
+        vec3.fromValues(0, 1, 0),        // up: world up
         viewMatrix
     );
-    mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);
+    /*mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);*/
     mat4.invert(modelMatrix, normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
-    viewMatrix = updateViewMatrix(directionX, -directionY, viewMatrix);
+    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
     return {
         modelMatrixF: modelMatrix,
         viewMatrixF: viewMatrix,
@@ -1139,13 +1142,6 @@ function cmRenderPass(commandEncoder){
 
 function surfaceRenderPass(commandEncoder){
 
-    depthLookup = updateDepthLookup();
-    device.queue.writeBuffer(
-        depthBuffer,
-        0,
-        new Float32Array([depthLookup]),
-    );
-
     const {modelMatrixS, viewMatrixS, normMatrixS} = getSurfaceMatrices();
 
     //console.log("model:",modelMatrixS);
@@ -1185,12 +1181,6 @@ function surfaceRenderPass(commandEncoder){
 
 function floorRenderPass(commandEncoder){
     //console.log("Rendering Floor...");
-    depthLookup = updateDepthLookup();
-    device.queue.writeBuffer(
-        depthBuffer,
-        0,
-        new Float32Array([depthLookup]),
-    );
     const {modelMatrixF, viewMatrixF, normMatrixF} = getFloorMatrices();
 
     //console.log("model:",modelMatrixF);
@@ -1241,12 +1231,9 @@ function updateViewMatrix(directionX, directionY, viewMatrix){
     const elapsedTime = now - lastFrameTime;
     lastFrameTime = now;
 
-    if (directionX !== 0){
+    if (directionX !== 0 || directionY !== 0){
         logicalTime -= elapsedTime;
         lastAxisX = logicalTime * directionX;
-    }
-    if (directionY !== 0){
-        logicalTime -= elapsedTime;
         lastAxisY = logicalTime * directionY;
     }
 
@@ -1302,7 +1289,7 @@ function frame() {
     refractRenderPass(commandEncoder);
     cmRenderPass(commandEncoder);
     surfaceRenderPass(commandEncoder);
-    floorRenderPass(commandEncoder);
+    //floorRenderPass(commandEncoder);
 
     device.queue.submit([commandEncoder.finish()]);
 

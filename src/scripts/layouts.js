@@ -147,7 +147,11 @@ function createBindLayouts(device){
 function createPipelineLayouts(device) {
 
     const refractPipelineLayout = device.createPipelineLayout({
-        bindGroupLayouts: [textureBindGroupLayout2, lightMaterialBindGroupLayout, matrixBindGroupLayout],
+        bindGroupLayouts: [
+            textureBindGroupLayout2,
+            lightMaterialBindGroupLayout,
+            matrixBindGroupLayout
+        ],
     });
 
     const cubeMapPipelineLayout = device.createPipelineLayout({
