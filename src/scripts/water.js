@@ -136,7 +136,7 @@ let noiseDepth = 256;
 const noiseData = new Float32Array(noiseWidth * noiseHeight * noiseDepth);
 fillDataArray(noiseData, noiseHeight, noiseWidth, noiseDepth);
 for (let i = 0; i < noiseData.length; i++) {
-    noiseData[i] = Math.pow(noiseData[i] / 255.0, 2.2); // gamma correction
+    noiseData[i] = Math.pow(noiseData[i] / 255.0, 2.2);
 }
 console.log(noiseData);
 

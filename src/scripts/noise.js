@@ -31,7 +31,6 @@ function smooth(zoom, x1, y1, z1, noiseData, noiseHeight, noiseWidth, noiseDepth
     return value;
 }
 
-
 function turbulence(x, y, z, maxZoom, data, noiseHeight, noiseWidth, noiseDepth) {
     let sum = (Math.sin((1.0 / 512.0) * (8 * Math.PI) * (x + z - 4 * y)) + 1) * 8.0;
     let zoom = maxZoom;

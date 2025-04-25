@@ -105,15 +105,13 @@ fn main(
 	var reflectColor = vec4f();
 	var refractColor = vec4f();
 	var color = vec4f();
-	let blueColor = vec4f(0.0, 0.25, 1.0, 1.0);
 
     var fresnel = acos(cosFres);
     fresnel = pow(clamp(fresnel - 0.3, 0.0, 1.0), 3.0);
-    refractColor = textureSample(refractTexture, texSampler, (vec2(input.glp.x,input.glp.y))/(2.0*input.glp.w)+0.5);
-    reflectColor = textureSample(reflectTexture, texSampler, (vec2(input.glp.x,-input.glp.y))/(2.0*input.glp.w)+0.5);
+    refractColor = textureSample(refractTexture, texSampler, (vec2f(input.glp.x,input.glp.y))/(2.0*input.glp.w)+0.5);
+    reflectColor = textureSample(reflectTexture, texSampler, (vec2f(input.glp.x,-input.glp.y))/(2.0*input.glp.w)+0.5);
     reflectColor = vec4f((reflectColor.xyz * (ambient + diffuse) + 0.75*specular), 1.0);
     color = mix(refractColor, reflectColor, fresnel);
-    //color = reflectColor;
 
     return color;
 }

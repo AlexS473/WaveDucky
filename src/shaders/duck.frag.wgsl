@@ -28,9 +28,7 @@ in: VertexOutput,
 
         let lightDir = normalize(vec3f(0.5, 0.8, -0.6));
         let viewDir = normalize(-in.clip_position.xyz);
-
         let ambient = material.ambient.rgb;
-
         let diffStrength = max(dot(norm, lightDir), 0.0);
         let diffuse = material.diffuse.rgb * diffStrength;
 
