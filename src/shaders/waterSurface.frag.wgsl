@@ -39,6 +39,7 @@ struct FragmentInput{
 @group(2) @binding(3) var<uniform> norm_matrix:mat4x4f;
 @group(2) @binding(4) var<uniform> depthOffset:f32;
 
+/*
 fn estimateWaveNormal(
     offset:f32,
     mapScale:f32,
@@ -57,6 +58,55 @@ fn estimateWaveNormal(
 	let normEst = normalize(cross(v4,v5));
 	return normEst;
 }
+*/
+// Hash for randomness (used in jittered FBM)
+fn hash(p: vec2f) -> f32 {
+    return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453);
+}
+
+// FBM noise function with 3D texture
+fn fbmNoise(tc: vec3f) -> f32 {
+    var sum = 0.0;
+    var freq = 1.0;
+    var amp = 5.0;
+    var totalAmp = 0.0;
+
+    for (var i = 0; i < 4; i++) {
+        let samp = textureSampleLevel(noiseTexture, texSampler, tc * freq, 0.0).r;
+        sum += samp * amp;
+        totalAmp += amp;
+        freq *= 2.0;
+        amp *= 0.5;
+    }
+
+    return sum / totalAmp;
+}
+
+// Final normal estimator
+fn estimateWaveNormal(
+    offset: f32,
+    mapScale: f32,
+    hScale: f32,
+    tc: vec2f
+) -> vec3f {
+    let scaledTC = tc * mapScale;
+    let depth = depthOffset;
+
+    // Central differences to estimate slope in X and Y
+    let hL = fbmNoise(vec3f(scaledTC - vec2f(offset, 0.0), depth));
+    let hR = fbmNoise(vec3f(scaledTC + vec2f(offset, 0.0), depth));
+    let hD = fbmNoise(vec3f(scaledTC - vec2f(0.0, offset), depth));
+    let hU = fbmNoise(vec3f(scaledTC + vec2f(0.0, offset), depth));
+    let dzdx = (hR - hL) * hScale;
+    let dzdy = (hU - hD) * hScale;
+
+    // Tangents
+    let T = vec3f(1.0, dzdx, 0.0);
+    let B = vec3f(0.0, dzdy, 1.0);
+
+    // Final normal from cross product
+    return normalize(cross(B, T));
+}
 
 @fragment
 fn main(
@@ -71,7 +121,7 @@ fn main(
 	let L = vec3f(normalize(input.varyingLightDir));//works
 	let V = normalize(-v_matrix[3].xyz - input.varyingVertPos);//works
 	//let N = estimateWaveNormal(.0002, 32.0, 16.0, input.tc);
-	let N = estimateWaveNormal(.02, .3, 8.0, input.tc); //works
+	let N = estimateWaveNormal(0.0078, 0.3, 16.0, input.tc);
 	let Nfres = normalize(input.varyingNormal);//works
 
 	let cosTheta = f32(dot(L,N));//works
