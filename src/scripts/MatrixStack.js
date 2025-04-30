@@ -33,6 +33,10 @@ export class MatrixStack {
         mat4.translate(this.#matrix, translation, this.#matrix);
         return this;
     }
+    rotate(axis, angle) {
+        mat4.rotate(this.#matrix, axis, angle, this.#matrix);
+        return this;
+    }
     rotateX(angle) {
         mat4.rotateX(this.#matrix, angle, this.#matrix);
         return this;

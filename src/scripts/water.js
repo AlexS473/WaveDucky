@@ -39,6 +39,13 @@ const surfaceVertWGSL = await response.text();
 response = await fetch("./shaders/waterSurface.frag.wgsl");
 const surfaceFragWGSL = await response.text();
 
+response = await fetch("./shaders/duck.vert.wgsl");
+const duckVertWGSL = await response.text();
+
+response = await fetch("./shaders/duck.frag.wgsl");
+const duckFragWGSL = await response.text();
+
+
 //WebGPU + Canvas Setup
 const canvas = document.querySelector('canvas');
 const adapter = await navigator.gpu?.requestAdapter();
@@ -65,7 +72,7 @@ context.configure({
 var depthLookup = 0.0;
 let lastTime = Date.now() / 800;
 
-//----Shader Buffers
+//----Vertex Buffers
 
 const cubeVerticesBuffer = device.createBuffer({
     size: skyBoxVertexPositions.byteLength,
@@ -102,6 +109,15 @@ const planeNormBuffer = device.createBuffer({
 new Float32Array(planeNormBuffer.getMappedRange()).set(planeNormals);
 planeNormBuffer.unmap();
 
+let {
+    positionBuffer,
+    normalBuffer,
+    indexBuffer,
+    indexSize,
+    materials,
+    matIdBuffer
+} = await loadObj2(device, '../objects/ducky.obj');
+
 
 //Textures
 const reflectTexture = device.createTexture({
@@ -129,6 +145,8 @@ const refractDepthTexture = device.createTexture({
     format: "depth24plus",
     usage: GPUTextureUsage.RENDER_ATTACHMENT
 });
+
+let duckDepthTexture;
 
 let noiseHeight = 256;
 let noiseWidth = 256;
@@ -169,13 +187,16 @@ const { textureBindGroupLayout1,
         textureBindGroupLayout2,
         textureBindGroupLayout3,
         lightMaterialBindGroupLayout,
-        matrixBindGroupLayout   } = createBindLayouts(device);
+        matrixBindGroupLayout,
+        materialBindGroupLayout
+} = createBindLayouts(device);
 
 const {
     refractPipelineLayout,
     skyBoxPipelineLayout,
     surfacePipelineLayout,
-    floorPipelineLayout
+    floorPipelineLayout,
+    duckPipelineLayout
 } = createPipelineLayouts(device);
 
 //----Pipelines----
@@ -480,6 +501,71 @@ const floorPipeline = device.createRenderPipeline({
     },
 });
 
+const duckPipeline = device.createRenderPipeline({
+    label: 'duck pipeline',
+    layout: duckPipelineLayout,
+    vertex: {
+        module: device.createShaderModule({
+            code: duckVertWGSL,
+        }),
+        buffers: [
+            {
+                attributes: [
+                    {
+                        shaderLocation: 0,
+                        offset: 0,
+                        format: 'float32x3'
+                    }
+                ],
+                arrayStride: 4 * 3,
+                stepMode: 'vertex'
+            },
+            {
+                attributes: [
+                    {
+                        shaderLocation: 1,
+                        offset: 0,
+                        format: 'float32x3'
+                    }
+                ],
+                arrayStride: 4 * 3,
+                stepMode: 'vertex'
+            },
+            {
+                attributes: [
+                    {
+                        shaderLocation: 2,
+                        offset: 0,
+                        format: 'uint32'
+                    }
+                ],
+                arrayStride: 4,
+                stepMode: 'vertex'
+            }
+        ]
+    },
+    fragment: {
+        module: device.createShaderModule({
+            code: duckFragWGSL,
+        }),
+        targets: [
+            {
+                format: 'bgra8unorm',
+            }
+        ]
+    },
+    primitive: {
+        topology: 'triangle-list',
+        frontFace: 'ccw',
+        cullMode: 'none'
+    },
+    depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+        format: 'depth24plus'
+    }
+});
+
 let skyBoxTexture;
 {
     const imgSrcs = [
@@ -537,6 +623,7 @@ const refractModelMatBuffer = createMatrixBuffer();
 const skyBoxModelMatBuffer = createMatrixBuffer();
 const surfaceModelMatBuffer = createMatrixBuffer();
 const floorModelMatBuffer = createMatrixBuffer();
+const duckModelMatBuffer = createMatrixBuffer();
 
 //Normal Matrices
 const reflectNormMatBuffer = createMatrixBuffer();
@@ -544,17 +631,49 @@ const refractNormMatBuffer = createMatrixBuffer();
 const skyBoxNormMatBuffer = createMatrixBuffer();
 const surfaceNormMatBuffer = createMatrixBuffer();
 const floorNormMatBuffer = createMatrixBuffer();
+const duckNormMatBuffer = createMatrixBuffer();
 
 const depthBuffer = device.createBuffer({
     size: 4,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 
+const materialBuffer = device.createBuffer({
+    size: 256,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+});
+
+const matArray = Object.values(materials);
+const materialUniformValues = new Float32Array(16 * matArray.length);
+
+function padded(arr) {
+    return [...arr.map(parseFloat), 1.0];
+}
+
+matArray.forEach((mat, mIndex) => {
+    const base = mIndex * 16;
+
+    const ambient  = padded(mat.Ka || [0, 0, 0]);
+    const diffuse  = padded(mat.Kd || [0, 0, 0]);
+    const specular = padded(mat.Ks || [0, 0, 0]);
+    const shininess = parseFloat(mat.Ns ?? 1);
+
+    materialUniformValues.set(ambient, base);
+    materialUniformValues.set(diffuse, base + 4);
+    materialUniformValues.set(specular, base + 8);
+    materialUniformValues[base + 12] = shininess;
+});
+
+console.log(materialUniformValues);
+device.queue.writeBuffer(
+    materialBuffer,
+    0,
+    materialUniformValues
+);
+
 // Light properties
 let initialLightLoc = [-10.0, 10.0, -50.0];
 initialLightLoc = new Float32Array(initialLightLoc);
-let currentLightPos = initialLightLoc;
-let lightPos = new Float32Array(4);
 
 // Light components
 
@@ -751,6 +870,8 @@ const surfaceMatrixBindGroup = createMatrixBindGroup('surface matrix bind group'
 
 const floorMatrixBindGroup = createMatrixBindGroup('floor matrix bind group', floorModelMatBuffer, floorNormMatBuffer);
 
+const duckMatrixBindGroup = createMatrixBindGroup('duck matrix bind group', duckModelMatBuffer, duckNormMatBuffer);
+
 const surfaceTextureBindGroup = device.createBindGroup({
     label: 'surface texture bind group',
     layout: textureBindGroupLayout3,
@@ -778,6 +899,18 @@ const surfaceTextureBindGroup = device.createBindGroup({
             }),
         },
     ],
+});
+
+let materialBindGroup = device.createBindGroup({
+    layout: materialBindGroupLayout,
+    entries: [
+        {
+            binding: 0,
+            resource: {
+                buffer: materialBuffer,
+            }
+        },
+    ]
 });
 
 //---- Render Pass Descriptors
@@ -835,6 +968,27 @@ const renderPassDescriptor = {
         depthStoreOp: 'store',
     },
 };
+
+const duckRenderPassDescriptor= {
+    colorAttachments: [
+        {
+            view: undefined,
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            loadOp: 'load',
+            storeOp: 'store'
+        }
+    ],
+    depthStencilAttachment: {
+        //view: duckDepthTexture.createView(),
+        view: undefined,
+        depthClearValue: 1,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+        stencilClearValue: 0,
+    },
+};
+
+
 
 //-----MATRIX OPERATIONS------
 const aspect = canvas.width / canvas.height;
@@ -937,25 +1091,38 @@ function getFloorMatrices(stack) {
     }
 }
 
-function getDuckMatrices(direction) {
-    var modelMatrix = mat4.identity();
+function getDuckMatrices(stack) {
     var normMatrix = mat4.create();
-    mat4.translate(
-        modelMatrix,
-        vec3.fromValues(0, 0, 0),
-        modelMatrix
-    );
-    mat4.rotate(
-        modelMatrix,
-        vec3.fromValues(1, 1, 0),
-        1.5,
-        modelMatrix
-    );
-    mat4.invert(modelMatrix, normMatrix);
+
+    /*stack.scale(vec3.fromValues(50, 50, 50));
+    stack.rotateY(Math.PI);
+    stack.translate(vec3.fromValues(0, Math.sin(Date.now() / 800 * 0.02) * 0.05,0));
+    mat4.invert(stack.get(), normMatrix);
+    mat4.transpose(normMatrix, normMatrix);*/
+
+    // Simple bobbing effect using time
+    const time = Date.now() / 800;
+    const bob = Math.sin(time * 1.5) * 0.5; // bob amplitude
+
+    // Optional fake tilt
+    const tiltX = Math.sin(time * 1.1) * 0.1;
+    const tiltZ = Math.cos(time * 1.3) * 0.1;
+
+    // Boat position (change to where you want it to float)
+    const posX = 0;
+    const posZ = 0;
+
+    stack.translate(vec3.fromValues(posX, bob, posZ));
+    stack.rotateX(tiltX);
+    stack.rotateZ(tiltZ);
+    stack.scale(vec3.fromValues(50, 50, 50)); // Duck size
+    stack.rotateY(Math.PI); // Face forward
+
+    mat4.invert(stack.get(), normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
     return {
-        modelMatrixD: modelMatrix,
+        modelMatrixD: stack.get(),
         normMatrixD: normMatrix,
     }
 }
@@ -1212,6 +1379,57 @@ function floorRenderPass(commandEncoder){
     stack.restore();
 }
 
+function duckRenderPass(commandEncoder){
+
+    stack.save();
+    const {modelMatrixD, normMatrixD} = getDuckMatrices(stack);
+
+    device.queue.writeBuffer(
+        duckModelMatBuffer,
+        0,
+        modelMatrixD,
+    );
+    device.queue.writeBuffer(
+        duckNormMatBuffer,
+        0,
+        normMatrixD,
+    );
+
+    const colorTexture = context.getCurrentTexture();
+    duckRenderPassDescriptor.colorAttachments[0].view = colorTexture.createView();
+
+    if (!duckDepthTexture ||
+        duckDepthTexture.width !== context
+            .getCurrentTexture().width ||
+        duckDepthTexture.height !== context
+            .getCurrentTexture().height) {
+        if (duckDepthTexture) {
+            duckDepthTexture.destroy();
+        }
+        duckDepthTexture = device.createTexture({
+            size: [context
+                .getCurrentTexture().width, context
+                .getCurrentTexture().height],
+            dimension: '2d',
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
+    duckRenderPassDescriptor.depthStencilAttachment.view = duckDepthTexture.createView();
+
+    const duckPassEncoder = commandEncoder.beginRenderPass(duckRenderPassDescriptor);
+    duckPassEncoder.setPipeline(duckPipeline);
+    duckPassEncoder.setBindGroup(0, duckMatrixBindGroup);
+    duckPassEncoder.setBindGroup(1, materialBindGroup);
+    duckPassEncoder.setVertexBuffer(0, positionBuffer);
+    duckPassEncoder.setVertexBuffer(1, normalBuffer);
+    duckPassEncoder.setVertexBuffer(2, matIdBuffer);
+    duckPassEncoder.setIndexBuffer(indexBuffer, 'uint16');
+    duckPassEncoder.drawIndexed(indexSize);
+    duckPassEncoder.end();
+    stack.restore();
+}
+
 var directionX = 0;
 var directionY = 0;
 
@@ -1286,6 +1504,7 @@ function frame() {
     reflectRenderPass(commandEncoder);
     refractRenderPass(commandEncoder);
     surfaceRenderPass(commandEncoder);
+    duckRenderPass(commandEncoder);
 
     device.queue.submit([commandEncoder.finish()]);
 
