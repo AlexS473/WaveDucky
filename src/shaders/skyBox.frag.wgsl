@@ -16,4 +16,5 @@ fn main(
 
       let sampledColor = textureSample(myTexture, mySampler, cubemapVec);
       return sampledColor;
+      //return vec4f(0,1,0,.5);
 }

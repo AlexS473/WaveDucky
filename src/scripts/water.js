@@ -3,12 +3,13 @@ import {
     mat4,
 } from 'https://wgpu-matrix.org/dist/3.x/wgpu-matrix.module.js';
 
+import {MatrixStack} from "./MatrixStack.js";
 //----Imports
 import {
-    cubeMapVertexPositions,
-    cubeMapVertexSize,
-    cubeMapPositionOffset,
-    cubeMapVertexCount,
+    skyBoxVertexPositions,
+    skyBoxVertexSize,
+    skyBoxPositionOffset,
+    skyBoxVertexCount,
 } from '../verticies/cube.js';
 
 import {
@@ -20,11 +21,11 @@ import {
     planeNormals
 } from '../verticies/plane.js';
 
-let response = await fetch("./shaders/cubeMap.vert.wgsl");
-const cubeMapVertWGSL = await response.text();
+let response = await fetch("./shaders/skyBox.vert.wgsl");
+const skyBoxVertWGSL = await response.text();
 
-response = await fetch("./shaders/cubeMap.frag.wgsl");
-const cubeMapFragWGSL = await response.text();
+response = await fetch("./shaders/skyBox.frag.wgsl");
+const skyBoxFragWGSL = await response.text();
 
 response = await fetch("./shaders/floor.vert.wgsl");
 const floorVertWGSL = await response.text();
@@ -67,11 +68,11 @@ let lastTime = Date.now() / 800;
 //----Shader Buffers
 
 const cubeVerticesBuffer = device.createBuffer({
-    size: cubeMapVertexPositions.byteLength,
+    size: skyBoxVertexPositions.byteLength,
     usage: GPUBufferUsage.VERTEX,
     mappedAtCreation: true,
 });
-new Float32Array(cubeVerticesBuffer.getMappedRange()).set(cubeMapVertexPositions);
+new Float32Array(cubeVerticesBuffer.getMappedRange()).set(skyBoxVertexPositions);
 cubeVerticesBuffer.unmap();
 
 const planeVerticesBuffer = device.createBuffer({
@@ -138,7 +139,6 @@ fillDataArray(noiseData, noiseHeight, noiseWidth, noiseDepth);
 for (let i = 0; i < noiseData.length; i++) {
     noiseData[i] = Math.pow(noiseData[i] / 255.0, 2.2);
 }
-console.log(noiseData);
 
 const noiseTexture = device.createTexture({
     label: 'noise texture',
@@ -173,7 +173,7 @@ const { textureBindGroupLayout1,
 
 const {
     refractPipelineLayout,
-    cubeMapPipelineLayout,
+    skyBoxPipelineLayout,
     surfacePipelineLayout,
     floorPipelineLayout
 } = createPipelineLayouts(device);
@@ -181,19 +181,19 @@ const {
 //----Pipelines----
 const reflectionPipeline = device.createRenderPipeline({
     label: 'skybox reflection pipeline',
-    layout: cubeMapPipelineLayout,
+    layout: skyBoxPipelineLayout,
     vertex: {
         module: device.createShaderModule({
             label: 'cube map vert shader',
-            code: cubeMapVertWGSL,
+            code: skyBoxVertWGSL,
         }),
         buffers: [
             {
-                arrayStride: cubeMapVertexSize,
+                arrayStride: skyBoxVertexSize,
                 attributes: [
                     {
                         shaderLocation: 0,
-                        offset: cubeMapPositionOffset,
+                        offset: skyBoxPositionOffset,
                         format: 'float32x4',
                     },
                 ],
@@ -203,7 +203,7 @@ const reflectionPipeline = device.createRenderPipeline({
     fragment: {
         module: device.createShaderModule({
             label: 'cube map frag shader',
-            code: cubeMapFragWGSL,
+            code: skyBoxFragWGSL,
         }),
         targets: [
             {
@@ -217,7 +217,7 @@ const reflectionPipeline = device.createRenderPipeline({
         cullMode: 'none',
     },
     depthStencil: {
-        depthWriteEnabled: true,
+        depthWriteEnabled: false,
         depthCompare: 'less',
         format: 'depth24plus',
     },
@@ -272,7 +272,7 @@ const refractionPipeline = device.createRenderPipeline({
         targets: [
             {
                 format: 'rgba8unorm',
-                //format: presentationFormat,
+                // format: presentationFormat,
             },
         ],
     },
@@ -287,21 +287,21 @@ const refractionPipeline = device.createRenderPipeline({
     },
 });
 
-const cubeMapPipeline = device.createRenderPipeline({
+const skyBoxPipeline = device.createRenderPipeline({
     label: 'skybox pipeline',
-    layout: cubeMapPipelineLayout,
+    layout: skyBoxPipelineLayout,
     vertex: {
         module: device.createShaderModule({
             label: 'cube map vert shader',
-            code: cubeMapVertWGSL,
+            code: skyBoxVertWGSL,
         }),
         buffers: [
             {
-                arrayStride: cubeMapVertexSize,
+                arrayStride: skyBoxVertexSize,
                 attributes: [
                     {
                         shaderLocation: 0,
-                        offset: cubeMapPositionOffset,
+                        offset: skyBoxPositionOffset,
                         format: 'float32x4',
                     },
                 ],
@@ -311,7 +311,7 @@ const cubeMapPipeline = device.createRenderPipeline({
     fragment: {
         module: device.createShaderModule({
             label: 'cube map frag shader',
-            code: cubeMapFragWGSL,
+            code: skyBoxFragWGSL,
         }),
         targets: [
             {
@@ -480,7 +480,7 @@ const floorPipeline = device.createRenderPipeline({
     },
 });
 
-let cubemapTexture;
+let skyBoxTexture;
 {
     const imgSrcs = [
         '../images/xp.jpg',
@@ -496,7 +496,7 @@ let cubemapTexture;
     });
     const imageBitmaps = await Promise.all(promises);
 
-    cubemapTexture = device.createTexture({
+    skyBoxTexture = device.createTexture({
         dimension: '2d',
         size: [imageBitmaps[0].width, imageBitmaps[0].height, 6],
         format: 'rgba8unorm',
@@ -510,17 +510,13 @@ let cubemapTexture;
         const imageBitmap = imageBitmaps[i];
         device.queue.copyExternalImageToTexture(
             { source: imageBitmap },
-            { texture: cubemapTexture, origin: [0, 0, i] },
+            { texture: skyBoxTexture, origin: [0, 0, i] },
             [imageBitmap.width, imageBitmap.height]
         );
     }
 }
 
-const depthTexture = device.createTexture({
-    size: [canvas.width, canvas.height],
-    format: 'depth24plus',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT,
-});
+let depthTexture;
 
 //----Uniforms and Uniform Buffers
 const matrixBufferSize = 4 * 16;
@@ -533,35 +529,20 @@ function createMatrixBuffer(){
 }
 
 const projectionMatBuffer = createMatrixBuffer();
+const viewMatrixBuffer = createMatrixBuffer();
 
+//Model Matrices
 const reflectModelMatBuffer = createMatrixBuffer();
-
 const refractModelMatBuffer = createMatrixBuffer();
-
-const cmModelMatBuffer = createMatrixBuffer();
-
+const skyBoxModelMatBuffer = createMatrixBuffer();
 const surfaceModelMatBuffer = createMatrixBuffer();
-
 const floorModelMatBuffer = createMatrixBuffer();
 
-const reflectViewMatBuffer = createMatrixBuffer();
-
-const refractViewMatBuffer = createMatrixBuffer();
-
-const cmViewMatBuffer = createMatrixBuffer();
-
-const surfaceViewMatBuffer = createMatrixBuffer();
-
-const floorViewMatBuffer = createMatrixBuffer();
-
+//Normal Matrices
 const reflectNormMatBuffer = createMatrixBuffer();
-
 const refractNormMatBuffer = createMatrixBuffer();
-
-const cmNormMatBuffer = createMatrixBuffer();
-
+const skyBoxNormMatBuffer = createMatrixBuffer();
 const surfaceNormMatBuffer = createMatrixBuffer();
-
 const floorNormMatBuffer = createMatrixBuffer();
 
 const depthBuffer = device.createBuffer({
@@ -656,7 +637,7 @@ const sampler = device.createSampler({
 });
 
 //Uniform Bind Groups
-const cubeMapTextureBindGroup = device.createBindGroup({
+const skyBoxTextureBindGroup = device.createBindGroup({
     label: 'cube map texture bind group',
     layout: textureBindGroupLayout1,
     entries: [
@@ -666,7 +647,7 @@ const cubeMapTextureBindGroup = device.createBindGroup({
         },
         {
             binding: 1,
-            resource: cubemapTexture.createView({
+            resource: skyBoxTexture.createView({
                 dimension: 'cube',
             }),
         },
@@ -698,8 +679,6 @@ const LiMatBindGroup = device.createBindGroup({
             binding: 0,
             resource: {
                 buffer: lightUniformBuffer,
-                offset: 0,
-                size: lightUniformBufferSize,
             }
         },
         {
@@ -713,7 +692,7 @@ const LiMatBindGroup = device.createBindGroup({
     ],
 });
 
-function createMatrixBindGroup(label, modelMatBuffer, viewMatBuffer, normMatBuffer) {
+function createMatrixBindGroup(label, modelMatBuffer, normMatBuffer) {
     return device.createBindGroup({
         label: label,
         layout: matrixBindGroupLayout,
@@ -729,7 +708,7 @@ function createMatrixBindGroup(label, modelMatBuffer, viewMatBuffer, normMatBuff
             {
                 binding: 1,
                 resource: {
-                    buffer: viewMatBuffer,
+                    buffer: viewMatrixBuffer,
                     offset: 0,
                     size: matrixBufferSize,
                 }
@@ -762,15 +741,15 @@ function createMatrixBindGroup(label, modelMatBuffer, viewMatBuffer, normMatBuff
     });
 }
 
-const reflectMatrixBindGroup = createMatrixBindGroup('reflection matrix bind group', reflectModelMatBuffer,reflectViewMatBuffer, reflectNormMatBuffer);
+const reflectMatrixBindGroup = createMatrixBindGroup('reflection matrix bind group', reflectModelMatBuffer, reflectNormMatBuffer);
 
-const refractMatrixBindGroup = createMatrixBindGroup('refraction matrix bind group', refractModelMatBuffer,refractViewMatBuffer, refractNormMatBuffer);
+const refractMatrixBindGroup = createMatrixBindGroup('refraction matrix bind group', refractModelMatBuffer, refractNormMatBuffer);
 
-const cmMatrixBindGroup = createMatrixBindGroup('sky box matrix bind group', cmModelMatBuffer,cmViewMatBuffer, cmNormMatBuffer);
+const skyBoxMatrixBindGroup = createMatrixBindGroup('sky box matrix bind group', skyBoxModelMatBuffer, skyBoxNormMatBuffer);
 
-const surfaceMatrixBindGroup = createMatrixBindGroup('surface matrix bind group', surfaceModelMatBuffer,surfaceViewMatBuffer, surfaceNormMatBuffer);
+const surfaceMatrixBindGroup = createMatrixBindGroup('surface matrix bind group', surfaceModelMatBuffer, surfaceNormMatBuffer);
 
-const floorMatrixBindGroup = createMatrixBindGroup('floor matrix bind group', floorModelMatBuffer,floorViewMatBuffer, floorNormMatBuffer);
+const floorMatrixBindGroup = createMatrixBindGroup('floor matrix bind group', floorModelMatBuffer, floorNormMatBuffer);
 
 const surfaceTextureBindGroup = device.createBindGroup({
     label: 'surface texture bind group',
@@ -808,13 +787,13 @@ const reflectRenderPassDescriptor = {
         {
             view: reflectTexture.createView(),
             //view: undefined,
-            loadOp: 'clear',
+            loadOp: 'load',
             storeOp: 'store'
         }
     ],
     depthStencilAttachment: {
         view: reflectDepthTexture.createView(),
-        //view: depthTexture.createView(),
+        //view: undefined,
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -826,13 +805,13 @@ const refractRenderPassDescriptor = {
         {
             view: refractTexture.createView(),
             //view: undefined,
-            loadOp: 'clear',
+            loadOp: 'load',
             storeOp: 'store'
         }
     ],
     depthStencilAttachment: {
         view: refractDepthTexture.createView(),
-        //view: depthTexture.createView(),
+        //view: undefined,
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -849,7 +828,8 @@ const renderPassDescriptor = {
         }
     ],
     depthStencilAttachment: {
-        view: depthTexture.createView(),
+        //view: depthTexture.createView(),
+        view: undefined,
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -858,7 +838,19 @@ const renderPassDescriptor = {
 
 //-----MATRIX OPERATIONS------
 const aspect = canvas.width / canvas.height;
-const projectionMatrix = mat4.perspective((2 * Math.PI) / 5, aspect, 1, 3000);
+const projectionMatrix = mat4.perspective(Math.PI/3, aspect, 1, 1000);
+
+var viewMatrix = mat4.identity();
+var degree =0;
+
+mat4.lookAt(
+    vec3.fromValues(0, 70, -15),
+    vec3.fromValues(0, 0, 0),
+    vec3.fromValues(0, 0, 1),
+    viewMatrix
+);
+
+const stack = new MatrixStack();
 
 device.queue.writeBuffer(
     projectionMatBuffer,
@@ -867,51 +859,30 @@ device.queue.writeBuffer(
 );
 
 //Reflection Matrix Setup
-function getReflectionMatrices() {
-    var modelMatrix = mat4.scaling(vec3.fromValues(100, 100, 100));
-    var viewMatrix = mat4.identity();
+function getReflectionMatrices(stack) {
     var normMatrix = mat4.create();
 
-    mat4.lookAt(
-        vec3.fromValues(0, 80, 0),     // eye directly above
-        vec3.fromValues(0, 0, 0),       // looking straight down
-        vec3.fromValues(0, 0, 1),      // up is -Z so "top" stays top
-        viewMatrix
-    );
+    //stack.rotateX(degree);
+    stack.scale(vec3.fromValues(130, 1, 130));
+    //stack.translate(vec3.fromValues(0, -3, 0));
 
-    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
+
     return {
-        modelMatrixRf: modelMatrix,
-        viewMatrixRf: viewMatrix,
+        modelMatrixRf: stack.get(),
         normMatrixRf: normMatrix,
     }
 }
 
-function getRefractionMatrices() {
-    var modelMatrix = mat4.identity();
-    var viewMatrix = mat4.identity();
+function getRefractionMatrices(stack) {
     var normMatrix = mat4.create();
 
-    mat4.translate(
-        modelMatrix,
-        vec3.fromValues(0, -10, 0),
-        modelMatrix
-    );
-    mat4.lookAt(
-        vec3.fromValues(0, 80, 0),     // eye directly above
-        vec3.fromValues(0, 0, 0),       // looking straight down
-        vec3.fromValues(0, 0, -1),      // up is -Z so "top" stays top
-        viewMatrix
-    );
-    /*mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);*/
-    mat4.invert(modelMatrix, normMatrix);
+    stack.rotateX(-1.340000000000001);
+    mat4.invert(stack.get(), normMatrix);
     mat4.transpose(normMatrix, normMatrix);
-
-    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
+    //stack.rotateX(-1.340000000000001);
 
     return {
-        modelMatrixRf: modelMatrix,
-        viewMatrixRf: viewMatrix,
+        modelMatrixRf: stack.get(),
         normMatrixRf: normMatrix,
     }
 }
@@ -920,87 +891,48 @@ function updateDepthLookup() {
     const now = Date.now() / 800;
     const elapsedTime = now - lastTime;
     lastTime = now;
-
-    //return depthLookup += elapsedTime * .0001; //Orginal
-    return depthLookup = (Math.sin(now * 0.005) + 1.0) * 0.5;
+    return depthLookup += elapsedTime * .001;
 }
 
-function getCubeMapMatrices() {
-    var modelMatrix = mat4.scaling(vec3.fromValues(100, 100, 100));
-    var viewMatrix = mat4.identity();
+function getSkyBoxMatrices(stack) {
     var normMatrix = mat4.create();
 
-    mat4.lookAt(
-        vec3.fromValues(0, 50, -10),
-        vec3.fromValues(0, 0, 0),
-        vec3.fromValues(0.0, 1, 0),
-        viewMatrix
-    );
-
-    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
+    stack.rotateX(Math.PI / 3);
+    stack.scale(vec3.fromValues(100, 100, 100));
+    stack.translate(vec3.fromValues(0, 0, 0));
 
     return {
-        modelMatrixCm: modelMatrix,
-        viewMatrixCm: viewMatrix,
-        normMatrixCm: normMatrix,
+        modelMatrixSb: stack.get(),
+        normMatrixSb: normMatrix,
     }
 }
 
-function getSurfaceMatrices() {
-    var modelMatrix = mat4.identity();
-    //var modelMatrix = mat4.scaling(vec3.fromValues(100, 100, 100));
-    var viewMatrix = mat4.identity();
+function getSurfaceMatrices(stack) {
     var normMatrix = mat4.create();
 
-    mat4.invert(modelMatrix, normMatrix);
+    stack.rotateX(Math.PI / 3);
+
+    mat4.invert(stack.get(), normMatrix);
     mat4.transpose(normMatrix, normMatrix);
 
-    mat4.rotateX(modelMatrix, -Math.PI / 2, modelMatrix);
-
-    mat4.lookAt(
-        vec3.fromValues(0, 50, 0),     // eye directly above
-        vec3.fromValues(0, 0, 0),       // looking straight down
-        vec3.fromValues(0, 0, -1),      // up is -Z so "top" stays top
-        viewMatrix
-    );
-    /*mat4.rotateX(
-        viewMatrix,
-        -90 * Math.PI/180,
-        viewMatrix
-    )*/
-    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
-
     return {
-        modelMatrixS: modelMatrix,
-        viewMatrixS: viewMatrix,
+        modelMatrixS: stack.get(),
         normMatrixS: normMatrix,
     }
 }
 
-function getFloorMatrices() {
-    var modelMatrix = mat4.identity();
-    var viewMatrix = mat4.identity();
-    var normMatrix = mat4.create();
+function getFloorMatrices(stack) {
+    var normMatrix = mat4.identity();
 
-    mat4.translate(
-        modelMatrix,
-        vec3.fromValues(0, -10, 0),
-        modelMatrix
-    );
-    mat4.lookAt(
-        vec3.fromValues(0, 100, 100),    // eye: elevated & pulled back
-        vec3.fromValues(0, 0, 0),        // target: center of scene
-        vec3.fromValues(0, 1, 0),        // up: world up
-        viewMatrix
-    );
-    /*mat4.rotateX(viewMatrix, -90 * Math.PI / 180, viewMatrix);*/
-    mat4.invert(modelMatrix, normMatrix);
+     // aligns with bottom of cube
+    stack.rotateX(Math.PI / 3);
+    stack.translate(vec3.fromValues(0, -60, 0));
+
+    mat4.invert(stack.get(), normMatrix);
     mat4.transpose(normMatrix, normMatrix);
-
-    viewMatrix = updateViewMatrix(directionX, directionY, viewMatrix);
+    
     return {
-        modelMatrixF: modelMatrix,
-        viewMatrixF: viewMatrix,
+        modelMatrixF: stack.get(),
         normMatrixF: normMatrix,
     }
 }
@@ -1030,17 +962,15 @@ function getDuckMatrices(direction) {
 
 //Render Pass Functions
 function reflectRenderPass(commandEncoder){
-    const {modelMatrixRf, viewMatrixRf, normMatrixRf} = getReflectionMatrices();
+
+    stack.save();
+
+    const {modelMatrixRf, normMatrixRf} = getReflectionMatrices(stack);
 
     device.queue.writeBuffer(
         reflectModelMatBuffer,
         0,
         modelMatrixRf,
-    );
-    device.queue.writeBuffer(
-        reflectViewMatBuffer,
-        0,
-        viewMatrixRf,
     );
     device.queue.writeBuffer(
         reflectNormMatBuffer,
@@ -1051,33 +981,41 @@ function reflectRenderPass(commandEncoder){
     //For Testing
     /*reflectRenderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
-        .createView();*/
+        .createView();
+
+    if (!depthTexture ||
+        depthTexture.width !== context
+            .getCurrentTexture().width ||
+        depthTexture.height !== context
+            .getCurrentTexture().height) {
+        if (depthTexture) {
+            depthTexture.destroy();
+        }
+        depthTexture = device.createTexture({
+            size: [context
+                .getCurrentTexture().width, context
+                .getCurrentTexture().height],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
+    reflectRenderPassDescriptor.depthStencilAttachment.view = depthTexture.createView();*/
 
     const rPassEncoder = commandEncoder.beginRenderPass(reflectRenderPassDescriptor);
     rPassEncoder.setPipeline(reflectionPipeline);
     rPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
-    rPassEncoder.setBindGroup(0, cubeMapTextureBindGroup);
+    rPassEncoder.setBindGroup(0, skyBoxTextureBindGroup);
     rPassEncoder.setBindGroup(1, reflectMatrixBindGroup);
-    rPassEncoder.draw(cubeMapVertexCount);
+    rPassEncoder.draw(skyBoxVertexCount);
     rPassEncoder.end();
+    stack.restore();
 }
 
 function refractRenderPass(commandEncoder){
 
-    depthLookup = updateDepthLookup();
-    device.queue.writeBuffer(
-        depthBuffer,
-        0,
-        new Float32Array([depthLookup]),
-    );
+    stack.save();
+    const {modelMatrixRf, normMatrixRf} = getRefractionMatrices(stack);
 
-    const {modelMatrixRf, viewMatrixRf, normMatrixRf} = getRefractionMatrices();
-
-    device.queue.writeBuffer(
-        refractViewMatBuffer,
-        0,
-        viewMatrixRf,
-    );
     device.queue.writeBuffer(
         refractModelMatBuffer,
         0,
@@ -1091,7 +1029,26 @@ function refractRenderPass(commandEncoder){
 
     /*refractRenderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
-        .createView();*/
+        .createView();
+
+    if (!depthTexture ||
+        depthTexture.width !== context
+            .getCurrentTexture().width ||
+        depthTexture.height !== context
+            .getCurrentTexture().height) {
+        if (depthTexture) {
+            depthTexture.destroy();
+        }
+        depthTexture = device.createTexture({
+            size: [context
+                .getCurrentTexture().width, context
+                .getCurrentTexture().height],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
+    refractRenderPassDescriptor.depthStencilAttachment.view = depthTexture.createView();*/
+
     const rPassEncoder = commandEncoder.beginRenderPass(refractRenderPassDescriptor);
     rPassEncoder.setPipeline(refractionPipeline);
     rPassEncoder.setVertexBuffer(0, planeVerticesBuffer);
@@ -1102,57 +1059,62 @@ function refractRenderPass(commandEncoder){
     rPassEncoder.setBindGroup(2, refractMatrixBindGroup);
     rPassEncoder.draw(planeVertexCount);
     rPassEncoder.end();
+    stack.restore();
 }
 
-function cmRenderPass(commandEncoder){
-    //console.log("Rendering Cubemap...");
-    const {modelMatrixCm, viewMatrixCm, normMatrixCm} = getCubeMapMatrices();
+function skyBoxRenderPass(commandEncoder){
 
-    //console.log("model:",modelMatrixCm);
-    //console.log("viewMatrixF:",viewMatrixCm);
-    //console.log("normMatrix:", normMatrixCm);
+    stack.save();
+    const {modelMatrixSb, normMatrixSb} = getSkyBoxMatrices(stack);
+
     device.queue.writeBuffer(
-        cmViewMatBuffer,
+        skyBoxModelMatBuffer,
         0,
-        viewMatrixCm,
+        modelMatrixSb,
     );
     device.queue.writeBuffer(
-        cmModelMatBuffer,
+        skyBoxNormMatBuffer,
         0,
-        modelMatrixCm,
-    );
-    device.queue.writeBuffer(
-        cmNormMatBuffer,
-        0,
-        normMatrixCm,
+        normMatrixSb,
     );
 
     renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
 
-    const cmPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-    cmPassEncoder.setPipeline(cubeMapPipeline);
-    cmPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
-    cmPassEncoder.setBindGroup(0, cubeMapTextureBindGroup);
-    cmPassEncoder.setBindGroup(1, cmMatrixBindGroup);
-    cmPassEncoder.draw(cubeMapVertexCount);
-    cmPassEncoder.end();
+    if (!depthTexture ||
+        depthTexture.width !== context
+            .getCurrentTexture().width ||
+        depthTexture.height !== context
+            .getCurrentTexture().height) {
+        if (depthTexture) {
+            depthTexture.destroy();
+        }
+        depthTexture = device.createTexture({
+            size: [context
+                .getCurrentTexture().width, context
+                .getCurrentTexture().height],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
+    renderPassDescriptor.depthStencilAttachment.view = depthTexture.createView();
+
+    const skyBoxPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+    skyBoxPassEncoder.setPipeline(skyBoxPipeline);
+    skyBoxPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
+    skyBoxPassEncoder.setBindGroup(0, skyBoxTextureBindGroup);
+    skyBoxPassEncoder.setBindGroup(1, skyBoxMatrixBindGroup);
+    skyBoxPassEncoder.draw(skyBoxVertexCount);
+    skyBoxPassEncoder.end();
+    stack.restore();
 }
 
 function surfaceRenderPass(commandEncoder){
 
-    const {modelMatrixS, viewMatrixS, normMatrixS} = getSurfaceMatrices();
+    stack.save();
+    const {modelMatrixS, normMatrixS} = getSurfaceMatrices(stack);
 
-    //console.log("model:",modelMatrixS);
-    //console.log("viewMatrix:",viewMatrixS);
-    //console.log("normMatrix:",normMatrixS);
-
-    device.queue.writeBuffer(
-        surfaceViewMatBuffer,
-        0,
-        viewMatrixS,
-    );
     device.queue.writeBuffer(
         surfaceModelMatBuffer,
         0,
@@ -1167,6 +1129,25 @@ function surfaceRenderPass(commandEncoder){
     renderPassDescriptor.colorAttachments[0].view = context
         .getCurrentTexture()
         .createView();
+
+    if (!depthTexture ||
+        depthTexture.width !== context
+            .getCurrentTexture().width ||
+        depthTexture.height !== context
+            .getCurrentTexture().height) {
+        if (depthTexture) {
+            depthTexture.destroy();
+        }
+        depthTexture = device.createTexture({
+            size: [context
+                .getCurrentTexture().width, context
+                .getCurrentTexture().height],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
+    renderPassDescriptor.depthStencilAttachment.view = depthTexture.createView();
+
     const sPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
     sPassEncoder.setPipeline(surfacePipeline);
     sPassEncoder.setVertexBuffer(0, planeVerticesBuffer);
@@ -1177,20 +1158,14 @@ function surfaceRenderPass(commandEncoder){
     sPassEncoder.setBindGroup(2, surfaceMatrixBindGroup);
     sPassEncoder.draw(planeVertexCount);
     sPassEncoder.end();
+    stack.restore();
 }
 
 function floorRenderPass(commandEncoder){
-    //console.log("Rendering Floor...");
-    const {modelMatrixF, viewMatrixF, normMatrixF} = getFloorMatrices();
 
-    //console.log("model:",modelMatrixF);
-    //console.log("viewMatrixF:",viewMatrixF);
-    //console.log("normMatrixF:",normMatrixF);
-    device.queue.writeBuffer(
-        floorViewMatBuffer,
-        0,
-        viewMatrixF,
-    );
+    stack.save();
+    const {modelMatrixF, normMatrixF} = getFloorMatrices(stack);
+
     device.queue.writeBuffer(
         floorModelMatBuffer,
         0,
@@ -1206,6 +1181,24 @@ function floorRenderPass(commandEncoder){
         .getCurrentTexture()
         .createView();
 
+    if (!depthTexture ||
+        depthTexture.width !== context
+            .getCurrentTexture().width ||
+        depthTexture.height !== context
+            .getCurrentTexture().height) {
+        if (depthTexture) {
+            depthTexture.destroy();
+        }
+        depthTexture = device.createTexture({
+            size: [context
+                .getCurrentTexture().width, context
+                .getCurrentTexture().height],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+    }
+    renderPassDescriptor.depthStencilAttachment.view = depthTexture.createView();
+
     const pPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
     pPassEncoder.setPipeline(floorPipeline);
     pPassEncoder.setVertexBuffer(0, planeVerticesBuffer);
@@ -1216,56 +1209,45 @@ function floorRenderPass(commandEncoder){
     pPassEncoder.setBindGroup(2, floorMatrixBindGroup);
     pPassEncoder.draw(planeVertexCount);
     pPassEncoder.end();
+    stack.restore();
 }
 
 var directionX = 0;
 var directionY = 0;
-var lastAxisX= 0;
-var lastAxisY= 0;
-var logicalTime = 0;
-var lastFrameTime = Date.now() / 1000;
-
 
 function updateViewMatrix(directionX, directionY, viewMatrix){
-    const now = Date.now() / 1000;
-    const elapsedTime = now - lastFrameTime;
-    lastFrameTime = now;
+
+    console.log(directionX);
+    console.log(directionY);
 
     if (directionX !== 0 || directionY !== 0){
-        logicalTime -= elapsedTime;
-        lastAxisX = logicalTime * directionX;
-        lastAxisY = logicalTime * directionY;
+        mat4.rotateZ(viewMatrix, 0+directionX , viewMatrix);
+        console.log(directionX);
+        mat4.rotateX(viewMatrix, 0+directionY , viewMatrix);
     }
-
-    mat4.rotateY(
-        viewMatrix,
-        lastAxisX,
-        viewMatrix
-    );
-
-    mat4.rotateX(
-        viewMatrix,
-        lastAxisY,
-        viewMatrix
-    );
-    return viewMatrix;
 }
 
-window.addEventListener("keydown", (event) => {
 
+window.addEventListener("keydown", (event) => {
+console.log (event.code);
     if (event.code === 'ArrowLeft') {
-        directionX = -1;
+        directionX = -0.02;
     }
     if (event.code === 'ArrowRight') {
-        directionX = 1;
+        directionX = 0.02;
     }
 
     if (event.code === 'ArrowDown') {
-        directionY = -1;
+        directionY = -0.02;
     }
     if (event.code === 'ArrowUp') {
-        directionY = 1;
+        directionY = 0.02;
     }
+    if(event.code == 'Numpad1'){
+        degree +=.01 ;
+        console.log(degree);
+    }
+    updateViewMatrix(directionX, directionY, viewMatrix);
 });
 
 window.addEventListener("keyup", (event) => {
@@ -1278,21 +1260,47 @@ window.addEventListener("keyup", (event) => {
     ){
         directionX = 0;
         directionY = 0;
+        updateViewMatrix(directionX, directionY, viewMatrix);
     }
 });
 
+
 function frame() {
+    device.queue.writeBuffer(
+        viewMatrixBuffer,
+        0,
+        viewMatrix,
+    );
+
+    depthLookup = updateDepthLookup();
+    device.queue.writeBuffer(
+        depthBuffer,
+        0,
+        new Float32Array([depthLookup]),
+    );
 
     const commandEncoder = device.createCommandEncoder();
 
+    skyBoxRenderPass(commandEncoder);
+    floorRenderPass(commandEncoder);
     reflectRenderPass(commandEncoder);
     refractRenderPass(commandEncoder);
-    cmRenderPass(commandEncoder);
     surfaceRenderPass(commandEncoder);
-    //floorRenderPass(commandEncoder);
 
     device.queue.submit([commandEncoder.finish()]);
 
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+const observer = new ResizeObserver(entries => {
+    for (const entry of entries) {
+        const canvas = entry.target;
+        const width = entry.contentBoxSize[0].inlineSize;
+        const height = entry.contentBoxSize[0].blockSize;
+        canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
+        canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
+        frame();
+    }
+});
+observer.observe(canvas);

@@ -36,7 +36,7 @@ in: VertexOutput,
         let specStrength = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
         let specular = material.specular.rgb * specStrength;
 
-        let finalColor = ambient*.5 + diffuse + specular;
+        let finalColor =  ambient*.2 + diffuse + specular;
         let finalOut = clamp(finalColor, vec3f(0.0), vec3f(1.0));
         return vec4f(finalOut, 1.0);
     }

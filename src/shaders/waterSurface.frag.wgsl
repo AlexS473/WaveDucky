@@ -71,7 +71,7 @@ fn main(
 	let L = vec3f(normalize(input.varyingLightDir));//works
 	let V = normalize(-v_matrix[3].xyz - input.varyingVertPos);//works
 	//let N = estimateWaveNormal(.0002, 32.0, 16.0, input.tc);
-	let N = estimateWaveNormal(.02, 1.0, 16.0, input.tc); //works
+	let N = estimateWaveNormal(.02, .3, 8.0, input.tc); //works
 	let Nfres = normalize(input.varyingNormal);//works
 
 	let cosTheta = f32(dot(L,N));//works
@@ -97,9 +97,9 @@ fn main(
 	let diffuse = lightDiffuse * matDiffuse * max(cosTheta,0.0);
 
 	let lightSpecular = vec3f(1.0, 1.0, 1.0);
-	let matSpecualar = vec3f(1.0, 1.0, 1.0);
+	let matSpecular = vec3f(1.0, 1.0, 1.0);
 	let matShininess = 250.0;
-	let specular = (lightSpecular * matSpecualar * pow(max(cosPhi,0.0), matShininess));
+	let specular = (lightSpecular * matSpecular * pow(max(cosPhi,0.5), matShininess));
 
 	var mixColor = vec4f();
 	var reflectColor = vec4f();
@@ -111,9 +111,12 @@ fn main(
     refractColor = textureSample(refractTexture, texSampler, (vec2f(input.glp.x,input.glp.y))/(2.0*input.glp.w)+0.5);
     reflectColor = textureSample(reflectTexture, texSampler, (vec2f(input.glp.x,-input.glp.y))/(2.0*input.glp.w)+0.5);
     reflectColor = vec4f((reflectColor.xyz * (ambient + diffuse) + 0.75*specular), 1.0);
-    color = mix(refractColor, reflectColor, fresnel);
+    color = mix(refractColor, reflectColor, .5);
 
     return color;
+
+
+
 }
 
 

@@ -56,13 +56,13 @@ fn estimateWaveNormal(
 
 fn checkerboard(tc:vec2f) -> vec3f
 {
-    let estNcb = vec3f(estimateWaveNormal(.02, 1.0, 0.05, tc));
+    let estNcb = vec3f(estimateWaveNormal(.02, .5, 0.05, tc));
 
 	let distortStrength = f32(0.1);
 
 	let distorted = vec2f(tc + estNcb.xz * distortStrength);
 
-	let tileScale = f32(64.0);
+	let tileScale = f32(16.0);
 	let tile = f32(floor(0.5 * (floor(distorted.x * tileScale) + floor(distorted.y * tileScale))) * 2.0 -
                    floor(distorted.x * tileScale) - floor(distorted.y * tileScale));
 
@@ -98,7 +98,7 @@ fn main(
 	let V = vec3f(normalize(-v_matrix[3].xyz - input.varyingVertPos));
 
     let estNlt = vec3f(estimateWaveNormal(.05, 32.0, 0.5, input.tc));
-    let distortStrength = f32(0.5);
+    let distortStrength = f32(0.05);
     let distort = vec2f(estNlt.xz * distortStrength);
     N = vec3f(normalize(N + vec3f(distort.x, 0.0, distort.y)));
 
@@ -114,9 +114,11 @@ fn main(
 	// compute ADS contributions (per pixel):
 	let ambient = ((light.globalAmbient * material.ambient) + (light.ambient * material.ambient)).xyz;
 	let diffuse = light.diffuse.xyz * material.diffuse.xyz * max(cosTheta,0.0);
-	let specular = (light.specular.xyz * material.specular.xyz * pow(max(cosPhi,0.0), material.shininess));
+	//let specular = (light.specular.xyz * material.specular.xyz * pow(max(cosPhi,0.0), material.shininess));
+	let specular = (light.specular.xyz * material.specular.xyz * pow(max(cosPhi,.15), material.shininess));
 	let checkers = checkerboard(input.tc);
 
+     //return vec4f(1,0,0,.5);
      return vec4f((checkers * (ambient + diffuse) + specular), 1.0);
 
 }

@@ -154,7 +154,7 @@ function createPipelineLayouts(device) {
         ],
     });
 
-    const cubeMapPipelineLayout = device.createPipelineLayout({
+    const skyBoxPipelineLayout = device.createPipelineLayout({
         bindGroupLayouts: [textureBindGroupLayout1, matrixBindGroupLayout],
     });
 
@@ -168,7 +168,7 @@ function createPipelineLayouts(device) {
 
     return{
         refractPipelineLayout: refractPipelineLayout,
-        cubeMapPipelineLayout: cubeMapPipelineLayout,
+        skyBoxPipelineLayout: skyBoxPipelineLayout,
         surfacePipelineLayout: surfacePipelineLayout,
         floorPipelineLayout: floorPipelineLayout
     }

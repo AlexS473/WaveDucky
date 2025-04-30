@@ -32,7 +32,7 @@ function smooth(zoom, x1, y1, z1, noiseData, noiseHeight, noiseWidth, noiseDepth
 }
 
 function turbulence(x, y, z, maxZoom, data, noiseHeight, noiseWidth, noiseDepth) {
-    let sum = (Math.sin((1.0 / 512.0) * (8 * Math.PI) * (x + z - 4 * y)) + 1) * 8.0;
+    let sum = (Math.sin((1.0 / 512.0) * (8 * Math.PI) * (x + z - 4 * y)) + 1) * 64.0;
     let zoom = maxZoom;
 
     while (zoom >= 0.9) {
@@ -44,14 +44,14 @@ function turbulence(x, y, z, maxZoom, data, noiseHeight, noiseWidth, noiseDepth)
 }
 
 function fillDataArray(data, noiseHeight, noiseWidth, noiseDepth) {
-    let maxZoom = 32.0;
+    let maxZoom = 16.0;
     let noise = new Float32Array(noiseWidth * noiseHeight * noiseDepth);
 
     for (let i = 0; i < noiseWidth; i++) {
         for (let j = 0; j < noiseHeight; j++) {
             for (let k = 0; k < noiseDepth; k++) {
                 let index = i * (noiseHeight * noiseDepth) + j * noiseDepth + k;
-                noise[index] = Math.random();
+                noise[index] = gaussianRandom();
             }
         }
     }
@@ -60,11 +60,16 @@ function fillDataArray(data, noiseHeight, noiseWidth, noiseDepth) {
         for (let j = 0; j < noiseWidth; j++) {
             for (let k = 0; k < noiseDepth; k++) {
                 let index = i * (noiseWidth * noiseDepth * 4) + j * (noiseDepth * 4) + k * 4;
-                let turbulenceValue = turbulence(i, j, k, maxZoom, data, noiseHeight, noiseWidth, noiseDepth); // Ensure this function is defined
+                let turbulenceValue = turbulence(i, j, k, maxZoom, noise, noiseHeight, noiseWidth, noiseDepth);
                 data[index] = data[index + 1] = data[index + 2] = Math.floor(turbulenceValue);
                 data[index + 3] = 255;
             }
         }
     }
 }
+
+function gaussianRandom() {
+    return Math.cos(2 * Math.PI * Math.random()) * Math.sqrt(-2 * Math.log(Math.random()));
+}
+
 

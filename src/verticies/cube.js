@@ -1,10 +1,10 @@
-export const cubeMapVertexSize = 4 * 10; // Byte size of one cube vertex.
-export const cubeMapPositionOffset = 0;
-export const cubeMapUVOffset = 4 * 8;
-export const cubeMapVertexCount = 36;
+export const skyBoxVertexSize = 4 * 10; // Byte size of one cube vertex.
+export const skyBoxPositionOffset = 0;
+export const skyBoxUVOffset = 4 * 8;
+export const skyBoxVertexCount = 36;
 
 // prettier-ignore
-export const cubeMapVertexPositions = new Float32Array([
+export const skyBoxVertexPositions = new Float32Array([
     // float4 position, float4 color, float2 uv,
     1, -1, 1, 1,   1, 0, 1, 1,  0, 1,
     -1, -1, 1, 1,  0, 0, 1, 1,  1, 1,
