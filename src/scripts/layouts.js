@@ -133,12 +133,21 @@ function createBindLayouts(device){
         ],
     });
 
+    materialBindGroupLayout = device.createBindGroupLayout({
+        entries: [{
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: { type: 'read-only-storage' }
+        }]
+    });
+
     return {
         textureBindGroupLayout1: textureBindGroupLayout1,
         textureBindGroupLayout2: textureBindGroupLayout2,
         textureBindGroupLayout3: textureBindGroupLayout3,
         lightMaterialBindGroupLayout: lightMaterialBindGroupLayout,
         matrixBindGroupLayout: matrixBindGroupLayout,
+        materialBindGroupLayout: materialBindGroupLayout,
     }
 }
 
@@ -166,11 +175,18 @@ function createPipelineLayouts(device) {
         bindGroupLayouts: [textureBindGroupLayout2, lightMaterialBindGroupLayout, matrixBindGroupLayout],
     });
 
+    const duckPipelineLayout = device.createPipelineLayout(
+        {
+            bindGroupLayouts: [matrixBindGroupLayout, materialBindGroupLayout],
+        }
+    );
+
     return{
         refractPipelineLayout: refractPipelineLayout,
         skyBoxPipelineLayout: skyBoxPipelineLayout,
         surfacePipelineLayout: surfacePipelineLayout,
-        floorPipelineLayout: floorPipelineLayout
+        floorPipelineLayout: floorPipelineLayout,
+        duckPipelineLayout: duckPipelineLayout,
     }
 }
 
