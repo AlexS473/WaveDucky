@@ -155,7 +155,7 @@ function createBindLayouts(device){
 
 function createPipelineLayouts(device) {
 
-    const refractPipelineLayout = device.createPipelineLayout({
+    const floorPipelineLayout = device.createPipelineLayout({
         bindGroupLayouts: [
             textureBindGroupLayout2,
             lightMaterialBindGroupLayout,
@@ -169,11 +169,7 @@ function createPipelineLayouts(device) {
 
     const surfacePipelineLayout = device.createPipelineLayout({
         bindGroupLayouts: [textureBindGroupLayout3, lightMaterialBindGroupLayout, matrixBindGroupLayout],
-    });
-
-    const floorPipelineLayout = device.createPipelineLayout({
-        bindGroupLayouts: [textureBindGroupLayout2, lightMaterialBindGroupLayout, matrixBindGroupLayout],
-    });
+    })
 
     const duckPipelineLayout = device.createPipelineLayout(
         {
@@ -182,10 +178,9 @@ function createPipelineLayouts(device) {
     );
 
     return{
-        refractPipelineLayout: refractPipelineLayout,
+        floorPipelineLayout: floorPipelineLayout,
         skyBoxPipelineLayout: skyBoxPipelineLayout,
         surfacePipelineLayout: surfacePipelineLayout,
-        floorPipelineLayout: floorPipelineLayout,
         duckPipelineLayout: duckPipelineLayout,
     }
 }

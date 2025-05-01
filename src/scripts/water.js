@@ -4,7 +4,7 @@ import {
 } from 'https://wgpu-matrix.org/dist/3.x/wgpu-matrix.module.js';
 
 import {MatrixStack} from "./MatrixStack.js";
-//----Imports
+
 import {
     skyBoxVertexPositions,
     skyBoxVertexSize,
@@ -192,10 +192,9 @@ const { textureBindGroupLayout1,
 } = createBindLayouts(device);
 
 const {
-    refractPipelineLayout,
+    floorPipelineLayout,
     skyBoxPipelineLayout,
     surfacePipelineLayout,
-    floorPipelineLayout,
     duckPipelineLayout
 } = createPipelineLayouts(device);
 
@@ -205,7 +204,7 @@ const reflectionPipeline = device.createRenderPipeline({
     layout: skyBoxPipelineLayout,
     vertex: {
         module: device.createShaderModule({
-            label: 'cube map vert shader',
+            label: 'sky box vert shader',
             code: skyBoxVertWGSL,
         }),
         buffers: [
@@ -223,13 +222,12 @@ const reflectionPipeline = device.createRenderPipeline({
     },
     fragment: {
         module: device.createShaderModule({
-            label: 'cube map frag shader',
+            label: 'sky box frag shader',
             code: skyBoxFragWGSL,
         }),
         targets: [
             {
                 format: 'rgba8unorm',
-                //format: presentationFormat,
             },
         ],
     },
@@ -246,7 +244,7 @@ const reflectionPipeline = device.createRenderPipeline({
 
 const refractionPipeline = device.createRenderPipeline({
     label: 'floor refraction pipeline',
-    layout: refractPipelineLayout,
+    layout: floorPipelineLayout,
     vertex: {
         module: device.createShaderModule({
             label: 'floor vert shader',
@@ -293,7 +291,6 @@ const refractionPipeline = device.createRenderPipeline({
         targets: [
             {
                 format: 'rgba8unorm',
-                // format: presentationFormat,
             },
         ],
     },
@@ -428,7 +425,7 @@ const surfacePipeline = device.createRenderPipeline({
 
 const floorPipeline = device.createRenderPipeline({
     label: 'floor pipeline',
-    layout: refractPipelineLayout,
+    layout: floorPipelineLayout,
     vertex: {
         module: device.createShaderModule({
             label: 'floor vert shader',
@@ -664,7 +661,6 @@ matArray.forEach((mat, mIndex) => {
     materialUniformValues[base + 12] = shininess;
 });
 
-console.log(materialUniformValues);
 device.queue.writeBuffer(
     materialBuffer,
     0,
@@ -1003,8 +999,6 @@ const duckRenderPassDescriptor= {
     },
 };
 
-
-
 //-----MATRIX OPERATIONS------
 const aspect = canvas.width / canvas.height;
 const projectionMatrix = mat4.perspective(Math.PI/3, aspect, 1, 1000);
@@ -1026,6 +1020,13 @@ device.queue.writeBuffer(
     0,
     projectionMatrix,
 );
+
+function updateDepthLookup() {
+    const now = Date.now() / 800;
+    const elapsedTime = now - lastTime;
+    lastTime = now;
+    return depthLookup += elapsedTime * .001;
+}
 
 //Reflection Matrix Setup
 function getReflectionMatrices(stack) {
@@ -1050,13 +1051,6 @@ function getRefractionMatrices(stack) {
         modelMatrixRf: stack.get(),
         normMatrixRf: normMatrix,
     }
-}
-
-function updateDepthLookup() {
-    const now = Date.now() / 800;
-    const elapsedTime = now - lastTime;
-    lastTime = now;
-    return depthLookup += elapsedTime * .001;
 }
 
 function getSkyBoxMatrices(stack) {
@@ -1089,7 +1083,6 @@ function getSurfaceMatrices(stack) {
 function getFloorMatrices(stack) {
     var normMatrix = mat4.identity();
 
-     // aligns with bottom of cube
     stack.rotateX(Math.PI / 3);
     stack.translate(vec3.fromValues(0, -60, 0));
 
@@ -1110,6 +1103,7 @@ function getDuckMatrices(stack) {
 
     const tiltX = Math.sin(time * 1.1) * 0.1;
     const tiltZ = Math.cos(time * 1.3) * 0.1;
+
 
     stack.translate(vec3.fromValues(0, bob, 0));
     stack.rotateX(-0.2800000000000001);
@@ -1384,59 +1378,6 @@ function duckRenderPass(commandEncoder){
     duckPassEncoder.end();
     stack.restore();
 }
-
-var directionX = 0;
-var directionY = 0;
-
-function updateViewMatrix(directionX, directionY, viewMatrix){
-
-    console.log(directionX);
-    console.log(directionY);
-
-    if (directionX !== 0 || directionY !== 0){
-        mat4.rotateZ(viewMatrix, 0+directionX , viewMatrix);
-        console.log(directionX);
-        mat4.rotateX(viewMatrix, 0+directionY , viewMatrix);
-    }
-}
-
-
-window.addEventListener("keydown", (event) => {
-console.log (event.code);
-    if (event.code === 'ArrowLeft') {
-        directionX = -0.02;
-    }
-    if (event.code === 'ArrowRight') {
-        directionX = 0.02;
-    }
-
-    if (event.code === 'ArrowDown') {
-        directionY = -0.02;
-    }
-    if (event.code === 'ArrowUp') {
-        directionY = 0.02;
-    }
-    if(event.code == 'Numpad1'){
-        degree +=.01 ;
-        console.log(degree);
-    }
-    updateViewMatrix(directionX, directionY, viewMatrix);
-});
-
-window.addEventListener("keyup", (event) => {
-
-    if (
-        event.code === 'ArrowLeft'||
-        event.code === 'ArrowRight' ||
-        event.code === 'ArrowUp'||
-        event.code === 'ArrowDown'
-    ){
-        directionX = 0;
-        directionY = 0;
-        updateViewMatrix(directionX, directionY, viewMatrix);
-    }
-});
-
 
 function frame() {
     device.queue.writeBuffer(
