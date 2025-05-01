@@ -605,7 +605,7 @@ let skyBoxTexture;
 let depthTexture;
 
 //----Uniforms and Uniform Buffers
-const matrixBufferSize = 4 * 16;
+const matrixBufferSize = 80;//4 * 16;
 
 function createMatrixBuffer(){
     return device.createBuffer({
@@ -672,7 +672,7 @@ device.queue.writeBuffer(
 );
 
 // Light properties
-let initialLightLoc = [-10.0, 10.0, -50.0];
+let initialLightLoc = [0.0, 10.0, -50.0];
 initialLightLoc = new Float32Array(initialLightLoc);
 
 // Light components
@@ -725,9 +725,9 @@ const matUniformBufferSize =
     4 * 4 + // ambient is 4 32bit floats (4bytes each)
     4 * 4 + // diffuse is 4 32bit floats (4bytes each)
     4 * 4 + // specular is 4 32bit floats (4bytes each)
-    4 * 4 + //shininess is 1 32bit float (4bytes) plus 3 bytes for padding
-    4 * 4 +
-    4 * 4;  // 4 bytes for padding
+    4 * 4 + // shininess is 1 32bit float (4bytes) plus 3 bytes for padding
+    4 * 4 + // 16 bytes for padding
+    4 * 4;  // 16 bytes for padding
 
 const matUniformBuffer = device.createBuffer({
     label: 'Uniforms for Material',
@@ -804,8 +804,6 @@ const LiMatBindGroup = device.createBindGroup({
             binding: 1,
             resource: {
                 buffer: matUniformBuffer,
-                offset: 0,
-                size: matUniformBufferSize,
             }
         },
     ],
@@ -860,17 +858,41 @@ function createMatrixBindGroup(label, modelMatBuffer, normMatBuffer) {
     });
 }
 
-const reflectMatrixBindGroup = createMatrixBindGroup('reflection matrix bind group', reflectModelMatBuffer, reflectNormMatBuffer);
+const reflectMatrixBindGroup = createMatrixBindGroup(
+    'reflection matrix bind group',
+    reflectModelMatBuffer,
+    reflectNormMatBuffer
+);
 
-const refractMatrixBindGroup = createMatrixBindGroup('refraction matrix bind group', refractModelMatBuffer, refractNormMatBuffer);
+const refractMatrixBindGroup = createMatrixBindGroup(
+    'refraction matrix bind group',
+    refractModelMatBuffer,
+    refractNormMatBuffer
+);
 
-const skyBoxMatrixBindGroup = createMatrixBindGroup('sky box matrix bind group', skyBoxModelMatBuffer, skyBoxNormMatBuffer);
+const skyBoxMatrixBindGroup = createMatrixBindGroup(
+    'sky box matrix bind group',
+    skyBoxModelMatBuffer,
+    skyBoxNormMatBuffer
+);
 
-const surfaceMatrixBindGroup = createMatrixBindGroup('surface matrix bind group', surfaceModelMatBuffer, surfaceNormMatBuffer);
+const surfaceMatrixBindGroup = createMatrixBindGroup(
+    'surface matrix bind group',
+    surfaceModelMatBuffer,
+    surfaceNormMatBuffer
+);
 
-const floorMatrixBindGroup = createMatrixBindGroup('floor matrix bind group', floorModelMatBuffer, floorNormMatBuffer);
+const floorMatrixBindGroup = createMatrixBindGroup(
+    'floor matrix bind group',
+    floorModelMatBuffer,
+    floorNormMatBuffer
+);
 
-const duckMatrixBindGroup = createMatrixBindGroup('duck matrix bind group', duckModelMatBuffer, duckNormMatBuffer);
+const duckMatrixBindGroup = createMatrixBindGroup(
+    'duck matrix bind group',
+    duckModelMatBuffer,
+    duckNormMatBuffer
+);
 
 const surfaceTextureBindGroup = device.createBindGroup({
     label: 'surface texture bind group',
@@ -914,19 +936,16 @@ let materialBindGroup = device.createBindGroup({
 });
 
 //---- Render Pass Descriptors
-
 const reflectRenderPassDescriptor = {
     colorAttachments: [
         {
             view: reflectTexture.createView(),
-            //view: undefined,
             loadOp: 'load',
             storeOp: 'store'
         }
     ],
     depthStencilAttachment: {
         view: reflectDepthTexture.createView(),
-        //view: undefined,
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -937,14 +956,12 @@ const refractRenderPassDescriptor = {
     colorAttachments: [
         {
             view: refractTexture.createView(),
-            //view: undefined,
             loadOp: 'load',
             storeOp: 'store'
         }
     ],
     depthStencilAttachment: {
         view: refractDepthTexture.createView(),
-        //view: undefined,
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
@@ -961,7 +978,6 @@ const renderPassDescriptor = {
         }
     ],
     depthStencilAttachment: {
-        //view: depthTexture.createView(),
         view: undefined,
         depthClearValue: 1.0,
         depthLoadOp: 'clear',
@@ -979,7 +995,6 @@ const duckRenderPassDescriptor= {
         }
     ],
     depthStencilAttachment: {
-        //view: duckDepthTexture.createView(),
         view: undefined,
         depthClearValue: 1,
         depthLoadOp: 'clear',
@@ -1016,10 +1031,7 @@ device.queue.writeBuffer(
 function getReflectionMatrices(stack) {
     var normMatrix = mat4.create();
 
-    //stack.rotateX(degree);
     stack.scale(vec3.fromValues(130, 1, 130));
-    //stack.translate(vec3.fromValues(0, -3, 0));
-
 
     return {
         modelMatrixRf: stack.get(),
@@ -1033,7 +1045,6 @@ function getRefractionMatrices(stack) {
     stack.rotateX(-1.340000000000001);
     mat4.invert(stack.get(), normMatrix);
     mat4.transpose(normMatrix, normMatrix);
-    //stack.rotateX(-1.340000000000001);
 
     return {
         modelMatrixRf: stack.get(),
@@ -1094,29 +1105,18 @@ function getFloorMatrices(stack) {
 function getDuckMatrices(stack) {
     var normMatrix = mat4.create();
 
-    /*stack.scale(vec3.fromValues(50, 50, 50));
-    stack.rotateY(Math.PI);
-    stack.translate(vec3.fromValues(0, Math.sin(Date.now() / 800 * 0.02) * 0.05,0));
-    mat4.invert(stack.get(), normMatrix);
-    mat4.transpose(normMatrix, normMatrix);*/
-
-    // Simple bobbing effect using time
     const time = Date.now() / 800;
-    const bob = Math.sin(time * 1.5) * 0.5; // bob amplitude
+    const bob = Math.sin(time * 1.5) * 0.5;
 
-    // Optional fake tilt
     const tiltX = Math.sin(time * 1.1) * 0.1;
     const tiltZ = Math.cos(time * 1.3) * 0.1;
 
-    // Boat position (change to where you want it to float)
-    const posX = 0;
-    const posZ = 0;
-
-    stack.translate(vec3.fromValues(posX, bob, posZ));
+    stack.translate(vec3.fromValues(0, bob, 0));
+    stack.rotateX(-0.2800000000000001);
     stack.rotateX(tiltX);
     stack.rotateZ(tiltZ);
-    stack.scale(vec3.fromValues(50, 50, 50)); // Duck size
-    stack.rotateY(Math.PI); // Face forward
+    stack.scale(vec3.fromValues(50, 50, 50));
+    stack.rotateY(Math.PI);
 
     mat4.invert(stack.get(), normMatrix);
     mat4.transpose(normMatrix, normMatrix);
@@ -1145,29 +1145,6 @@ function reflectRenderPass(commandEncoder){
         normMatrixRf,
     );
 
-    //For Testing
-    /*reflectRenderPassDescriptor.colorAttachments[0].view = context
-        .getCurrentTexture()
-        .createView();
-
-    if (!depthTexture ||
-        depthTexture.width !== context
-            .getCurrentTexture().width ||
-        depthTexture.height !== context
-            .getCurrentTexture().height) {
-        if (depthTexture) {
-            depthTexture.destroy();
-        }
-        depthTexture = device.createTexture({
-            size: [context
-                .getCurrentTexture().width, context
-                .getCurrentTexture().height],
-            format: 'depth24plus',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT,
-        });
-    }
-    reflectRenderPassDescriptor.depthStencilAttachment.view = depthTexture.createView();*/
-
     const rPassEncoder = commandEncoder.beginRenderPass(reflectRenderPassDescriptor);
     rPassEncoder.setPipeline(reflectionPipeline);
     rPassEncoder.setVertexBuffer(0, cubeVerticesBuffer);
@@ -1193,28 +1170,6 @@ function refractRenderPass(commandEncoder){
         0,
         normMatrixRf,
     );
-
-    /*refractRenderPassDescriptor.colorAttachments[0].view = context
-        .getCurrentTexture()
-        .createView();
-
-    if (!depthTexture ||
-        depthTexture.width !== context
-            .getCurrentTexture().width ||
-        depthTexture.height !== context
-            .getCurrentTexture().height) {
-        if (depthTexture) {
-            depthTexture.destroy();
-        }
-        depthTexture = device.createTexture({
-            size: [context
-                .getCurrentTexture().width, context
-                .getCurrentTexture().height],
-            format: 'depth24plus',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT,
-        });
-    }
-    refractRenderPassDescriptor.depthStencilAttachment.view = depthTexture.createView();*/
 
     const rPassEncoder = commandEncoder.beginRenderPass(refractRenderPassDescriptor);
     rPassEncoder.setPipeline(refractionPipeline);
