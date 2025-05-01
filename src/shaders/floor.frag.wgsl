@@ -74,7 +74,7 @@ fn getCausticValue(
     y:f32,
     z:f32) ->f32
 {
-    let w = f32(8);  // frequency of caustic ribbon patterns
+    let w = f32(8);
 	let strength = f32(4.0);
 	let PI = f32(3.14159);
 	let noise = textureSample(noiseTexture, noiseSampler, vec3(x*w,  y, z*w)).r;
@@ -114,11 +114,9 @@ fn main(
 	// compute ADS contributions (per pixel):
 	let ambient = ((light.globalAmbient * material.ambient) + (light.ambient * material.ambient)).xyz;
 	let diffuse = light.diffuse.xyz * material.diffuse.xyz * max(cosTheta,0.0);
-	//let specular = (light.specular.xyz * material.specular.xyz * pow(max(cosPhi,0.0), material.shininess));
 	let specular = (light.specular.xyz * material.specular.xyz * pow(max(cosPhi,.15), material.shininess));
 	let checkers = checkerboard(input.tc);
 
-     //return vec4f(1,0,0,.5);
      return vec4f((checkers * (ambient + diffuse) + specular), 1.0);
 
 }

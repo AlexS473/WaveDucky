@@ -26,7 +26,7 @@ in: VertexOutput,
         let material = materials[in.materialId];
         var norm:vec3<f32> = normalize(in.normal);
 
-        let lightDir = normalize(vec3f(0.5, 0.8, -0.6));
+        let lightDir = normalize(vec3f(0, 0.8, 0.6));
         let viewDir = normalize(-in.clip_position.xyz);
         let ambient = material.ambient.rgb;
         let diffStrength = max(dot(norm, lightDir), 0.0);
@@ -36,9 +36,8 @@ in: VertexOutput,
         let specStrength = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
         let specular = material.specular.rgb * specStrength;
 
-        let finalColor =  ambient*.2 + diffuse + specular;
-        let finalOut = clamp(finalColor, vec3f(0.0), vec3f(1.0));
-        return vec4f(finalOut, 1.0);
+        let finalColor =  ambient*.15 + diffuse + specular;
+        return vec4f(finalColor, 1.0);
     }
     else {
         return vec4f(0.0, 1.0, 0.0 ,1.0);
